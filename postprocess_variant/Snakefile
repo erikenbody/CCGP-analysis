@@ -1,0 +1,124 @@
+import pandas as pd
+import os
+# different than original because using a list of excluded files so use ^exclude
+# also we set rule all in the top level, so we dont need a sample sheet
+
+rule basic_filter:
+    """
+    Filters a vcf file to remove samples marked exclude, sites that don't pass filters,
+    sites with reference equal to N or alt equal to ., and sites with AF == 0.
+    """
+    input: 
+        vcf = "results/{refGenome}/{prefix}_raw.vcf.gz",
+        exclude = "results/{refGenome}/{prefix}_samps.txt"
+    output:
+        filtered = "results/{refGenome}/{prefix}_filtered.vcf.gz",
+        filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
+    conda:
+        "envs/filter.yml"
+    shell:
+        """
+        bcftools view -S ^{input.exclude} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+        bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered}
+        bcftools index {output.filtered}
+        """
+
+rule get_depth:
+    input: 
+        filtered = "results/{refGenome}/{prefix}_filtered.vcf.gz",
+        filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
+    output:
+        depth = "results/{refGenome}/{prefix}_depth.txt",
+    conda:
+        "envs/filter.yml"
+    shell:
+        """
+        bcftools query -f '%CHROM\t%POS\t%DP\n' {input.filtered} > {output.depth}
+        """
+
+rule create_cov_pos:
+    input:
+        depth = "results/{refGenome}/{prefix}_depth.txt"
+    output:
+        pos = "results/{refGenome}/callable_sites/{prefix}_excl_pos.txt"
+    params:
+        cov_threshold_stdev = config["cov_threshold_stdev"]
+    conda:
+        "envs/filter.yml"
+    script:
+        "scripts/get_snp_depth_pos.py"
+
+rule strict_filter:  
+    input: 
+        pos = "results/{refGenome}/callable_sites/{prefix}_excl_pos.txt",
+        vcf = "results/{refGenome}/{prefix}_filtered.vcf.gz",
+        filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
+    output: 
+        vcf = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz"),
+        idx = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi"),
+        gzpos = "results/{refGenome}/{prefix}_excl_pos.tsv.gz"
+    conda:
+        "envs/filter.yml"
+    params:
+        miss = config["missingness"],
+        maf = config["maf"],
+        chr_ex = config["scaffolds_to_exclude"]
+    shell:
+        """
+        bgzip -c {input.pos} > {output.gzpos}
+        tabix -s1 -b2 -e2 {output.gzpos}
+        #different from top level snakemake because need to streatm -t to -T
+        if [ -z "{params.chr_ex}" ]
+        then
+            bcftools view -T ^{output.gzpos} -m2 -M2 \
+            -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
+            {input.vcf} -O z -o {output.vcf}
+        else
+            bcftools view -t ^{params.chr_ex} -m2 -M2 \
+            -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
+            -O u {input.vcf} | bcftools view -T ^{output.gzpos} \
+            -O z -o {output.vcf} 
+        fi
+
+        bcftools index {output.vcf}
+        """
+
+rule subset_indels:
+    """
+    Produce a clean vcf with only indels variants.
+    """
+    input: 
+        vcf = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz",
+        idx = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi",
+    output: 
+        vcf = "results/{refGenome}/{prefix}_clean_indels.vcf.gz",
+        idx = "results/{refGenome}/{prefix}_clean_indels.vcf.gz.tbi"
+    conda:
+        "envs/filter.yml"
+    log:
+        "logs/{refGenome}/postprocess/{prefix}_subset_indels.txt"
+    shell:
+        """
+        bcftools view -v indels -O z -o {output.vcf} {input.vcf}
+        bcftools index -t {output.vcf}
+        """
+
+rule subset_snps:
+    """
+    Produce a clean vcf with only simple snps.
+    """
+    input: 
+        vcf = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz",
+        idx = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi"
+    output: 
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        idx = "results/{refGenome}/{prefix}_clean_snps.vcf.gz.tbi"
+    conda:
+        "envs/filter.yml"    
+    log:
+        "logs/{refGenome}/postprocess/{prefix}_subset_snps.txt"
+    shell:
+        """
+        bcftools view -v snps -e 'TYPE ~ "indel"' -O z -o {output.vcf} {input.vcf}
+        bcftools index -t {output.vcf}
+        """

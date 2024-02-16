@@ -1,0 +1,157 @@
+import os
+
+
+rule alagtr_tess:
+    """
+    call alagtr tess 
+    """
+    input:
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+        pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        coords = "results/{refGenome}/QC/{prefix}.coords.txt",
+        coords2 = "results/{refGenome}/algatr/{prefix}.coords.txt" #this should exist when it is made
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        rmislands = "true",
+        kvals = "1:5",
+        output_path = "results/{refGenome}/algatr/"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        "logs/{refGenome}/algatr/{prefix}_tess.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/{prefix}_TESS.benchmark.txt",
+    output: 
+    # Exported files are as follows:
+        tess1 = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
+        tess4 = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
+        tess5 = "results/{refGenome}/algatr/{prefix}_TESS_peakRAM.csv"
+    conda:
+        "envs/tess.yml"
+    script:
+        "scripts/TESS_cloud.R"
+
+
+rule generate_index:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+    output:
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
+    shell:
+        "bcftools index {input.vcf}"
+
+
+rule seperate_vcf:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
+    output:
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.scaff.txt"
+    shell:
+         "bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}"
+
+
+
+
+rule alagtr_RDA:
+    """
+    call alagtr tess 
+    """
+    input:
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
+        rmislands = "false",
+        pruned = "false",
+        impute = "simple",
+        kvals = "1:10",
+        correctGEO = "false",
+        correctPC = "false",
+        nPC = 3,
+        model = "best", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+        sig = 0.01, # only for outlier_method = "p"
+        z = 3, # only for outlier_method = "z"
+        Pin = 0.05,
+        R2permutations = 1000,
+        R2scope = "true",
+        p_adj = "fdr", # only if outlier_method = "p"
+        save_impute = "true",
+        intervals = "true",
+        scaff = "{scaff}"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.RDA.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.RDA.benchmark.txt",
+    output: 
+        #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
+        impute = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt", 
+        anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv",
+        #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
+        #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
+        #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
+        #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+    conda:
+        "envs/rda.yml"
+    script:
+        "scripts/RDA_cloud.R"
+
+rule get_vcf_samples:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+    output:
+        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+    shell:
+        "bcftools query -l {input.vcf} > {output.samps}"
+
+rule create_coords_sheet:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+    output:
+        "results/{refGenome}/algatr/{prefix}.coords.txt"
+    conda:
+        "envs/mongo.yml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        sample_id = config["sample_id"]
+    script:
+        "scripts/create_coord_sheet.py"
+
+rule wingen:
+    input:
+        pass
+    output:
+        pass
+    conda:
+        "envs/wingen.yml"
+    shell:
+        pass
+
+
+
+rule shapeit:
+    input:
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+    output:
+        haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.vcf.gz"
+    conda:
+        "envs/wingen.yml"
+    shell:
+        "shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
+
+    

@@ -1,0 +1,42 @@
+##############################
+# Variables you need to change
+##############################
+
+samples: "config/samples.csv" # path to the sample metadata CSV
+resource_config: "config/resources.yaml" # path to resources yaml config
+final_prefix: "41-Callipepla" # prefix for final output files
+refgenome: "GCA_023055505.1"
+bed: True
+trackhub_email: erik.enbody@gmail.com
+
+##############################
+# Variables you *might* need to change
+##############################
+
+## callable sites bed file options ##
+mappability_min: 1 #regions of the genome with mappability less than this will be removed from callable sites bed file
+mappability_k: 150 #the kmer used to compute mappability with genmap; you should not need to change this except in special cases
+
+#this ignores small regions of abberatant coverage/mappability as often these are just below the threshold
+#to do strict filtering, set to 0
+
+mappability_merge: 100 #merge passing mappability regions separated by this or fewer bp into a single region
+cov_merge: 100 #merge passing coverage regions separate by this or fewer bp into a single region
+
+## QC options ##
+nClusters: 3
+GoogleAPIKey:
+min_depth: 2
+
+## Filtering options ##
+
+contig_size: 10000 # snps on contigs this size or smaller will be filtered from the final clean vcfs. Set to 0 to disable.
+maf: 0.01 #snps with MAF below this value will be filtered from the final clean vcfs. Set to 0 to disable.
+missingness: 0.75 #snps with missingness greater than this value will be filtered from the final clean vcfs. Set to 1 to disable.
+scaffolds_to_exclude: "mtDNA,Y" #comma separated, no spaces list of scaffolds to exclude from final clean vcfs. Set to blank to disable.
+
+cov_threshold_stdev: 2
+
+
+
+

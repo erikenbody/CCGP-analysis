@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base==4.1.1
+  - r-optparse=1.7.3
+  - r-data.table=1.14.8
+  - r-devtools
+  - bcftools==1.12

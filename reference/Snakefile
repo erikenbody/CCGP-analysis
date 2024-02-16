@@ -1,0 +1,29 @@
+ruleorder: download_reference > index_reference
+
+rule download_reference:
+    output:
+        ref = "results/{refGenome}/data/genome/{refGenome}.fna"
+    params:
+        dataset = "results/{refGenome}/data/genome/{refGenome}_dataset.zip",
+        outdir = "results/{refGenome}/data/genome/{refGenome}"
+    conda:
+        "envs/fastq2bam.yml"
+    shell:
+        """
+        mkdir -p {params.outdir}
+        datasets download genome accession --exclude-gff3 --exclude-protein --exclude-rna --filename {params.dataset} {wildcards.refGenome} \
+        && 7z x {params.dataset} -aoa -o{params.outdir} \
+        && cat {params.outdir}/ncbi_dataset/data/{wildcards.refGenome}/*.fna > {output.ref}
+        """
+
+rule index_reference:
+    input:
+        ref = ancient("results/{refGenome}/data/genome/{refGenome}.fna")
+    output:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+    conda:
+        "envs/fastq2bam.yml"
+    shell:
+        """
+        samtools faidx {input.ref} --output {output.fai}
+        """

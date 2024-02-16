@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - samtools==1.14
+  - sra-tools==3.0.0
+  - ncbi-datasets-cli==11.25.1
+  - p7zip==16.02
+  - pigz==2.6
+  - curl>7.73.0
