@@ -1,0 +1,173 @@
+suppressMessages({
+  library(tidyverse)
+  library(raster)
+  library(vegan)
+  library(qvalue)
+  library(peakRAM)
+  library(here)
+  library(devtools)
+})
+
+# example call: `Rscript RDA_cloud.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" "outputs/RDA/" FALSE FALSE "structure" 1:5 FALSE FALSE 3 "best" 0.01 3 0.05 1000 TRUE "fdr"`
+
+#!/usr/bin/env Rscript # leave line commented
+species = snakemake@params[[1]]
+data_path = snakemake@params[[2]]
+output_path = snakemake@params[[3]]
+rmislands = snakemake@params[[4]]
+pruned = snakemake@params[[5]]
+impute = snakemake@params[[6]]
+kvals = snakemake@params[[7]] # no longer used
+correctGEO = snakemake@params[[8]]
+correctPC = snakemake@params[[9]]
+nPC = snakemake@params[[10]]
+model = snakemake@params[[11]]
+sig = snakemake@params[[12]] # only for outlier_method = "p"
+z = snakemake@params[[13]]# only for outlier_method = "z"
+Pin = snakemake@params[[14]]
+R2permutations = snakemake@params[[15]]
+R2scope = snakemake@params[[16]]
+p_adj = snakemake@params[[17]] # only if outlier_method = "p"
+#save_impute = snakemake@params[[18]]
+save_impute = TRUE
+
+# Exported files are as follows:
+#     (1) species_imputed_`impute`.txt # if save_impute = TRUE
+#     (2) species_RDA_anova_`model`.csv
+#     (3) species_RDA_cortest_`model`.csv
+#     (4) species_RDA_outliers_`model`_rdadapt.csv
+#     (5) species_RDA_outliers_`model`_Zscores.csv
+
+
+devtools::install_github("TheWangLab/algatr")
+suppressMessages(library(algatr))
+
+#need to interpret the kvals string as an expression
+kvals <- try(eval(parse(text = kvals)), silent = TRUE)
+#kvals <- 1:3
+#similar problem with logical true/false
+if (rmislands == "true") {
+  rmislands <- TRUE
+} else if (rmislands == "false") {
+  rmislands <- FALSE
+} else {
+  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
+}
+
+if (pruned == "true") {
+  pruned <- TRUE
+} else if (pruned == "false") {
+  pruned <- FALSE
+} else {
+  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
+}
+
+if (R2scope == "true") {
+  R2scope <- TRUE
+} else if (R2scope == "false") {
+  R2scope <- FALSE
+} else {
+  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
+}
+
+if (correctGEO == "true") {
+  correctGEO <- TRUE
+} else if (correctGEO == "false") {
+  correctGEO <- FALSE
+} else {
+  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
+}
+
+if (correctPC == "true") {
+  correctPC <- TRUE
+} else if (correctPC == "false") {
+  correctPC <- FALSE
+} else {
+  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
+}
+
+source(paste0(snakemake@scriptdir, "/general_functions.R"))
+
+
+# Import and process data -------------------------------------------------
+
+dat <- get_input_objects(species = species, 
+                         data_path = data_path,
+                         analysis = "vcf",
+                         pruned = pruned,
+                         impute = impute,
+                         rmislands = rmislands)
+
+# Extract and standardize environmental variables and make into dataframe
+env <- raster::extract(dat$envlayers, dat$coords)
+env <- scale(env, center = TRUE, scale = TRUE)
+env <- data.frame(env)
+
+
+# Run RDA -----------------------------------------------------------------
+
+mod <- algatr::rda_run(gen = dat$gen, 
+        env = env, 
+        coords = dat$coords, 
+        model = model, 
+        correctGEO = correctGEO, 
+        correctPC = correctPC, 
+        nPC = nPC, 
+        Pin = Pin, 
+        R2permutations = R2permutations, 
+        R2scope = R2scope)
+
+
+# Get outliers and run cortest --------------------------------------------
+
+rda_sig_z <- rda_getoutliers(mod, naxes = "all", outlier_method = "z", z = z, plot = FALSE)
+rda_sig_p <- rda_getoutliers(mod, naxes = "all", outlier_method = "p", p_adj = p_adj, sig = sig, plot = FALSE)
+
+# Extract genotypes for outlier SNPs
+rda_snps_p <- rda_sig_p$rda_snps
+rda_gen_p <- dat$gen[, rda_snps_p]
+rda_snps_z <- rda_sig_z$rda_snps
+rda_gen_z <- dat$gen[, rda_snps_z]
+
+# Run correlation test
+cor_df_p <- algatr::rda_cor(rda_gen_p, env)
+cor_df_z <- algatr::rda_cor(rda_gen_z, env)
+
+
+# Export results ----------------------------------------------------------
+
+export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_impute) {
+  outlier_helper <- function(df, outlier) {dat <- df %>% dplyr::mutate(outlier_method = outlier)}
+  
+  # RDA model results
+  readr::write_csv(mod$anova,
+                   file = paste0(output_path, species, "_RDA_anova_", model, ".csv"),
+                   col_names = TRUE)
+  
+  # Sig results Z-scores
+  readr::write_csv(rda_sig_z,
+                   file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
+                   col_names = TRUE)
+  
+  # Sig results p-values
+  snps <- rda_sig_p$rdadapt %>% 
+    dplyr::mutate(locus = colnames(dat$gen))
+  readr::write_csv(snps,
+                   file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
+                   col_names = TRUE)
+  
+  # Correlation test results
+  cor_test <- rbind(outlier_helper(cor_df_p, outlier = "p"),
+                    outlier_helper(cor_df_z, outlier = "z"))
+  readr::write_csv(cor_test, file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
+                   col_names = TRUE)
+
+  # Save imputed data
+  if (save_impute) {
+    write.table(dat$gen, file = paste0(output_path, species, "_imputed_", impute, ".txt"),
+                sep = " ", row.names = FALSE, col.names = TRUE, quote = FALSE)
+  }
+}
+
+# Export results
+export_rda(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_impute = save_impute)

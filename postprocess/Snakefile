@@ -1,0 +1,110 @@
+import pandas as pd
+import os
+rule basic_filter:
+    """
+    Filters a vcf file to remove samples marked exclude, sites that don't pass filters,
+    sites with reference equal to N or alt equal to ., and sites with AF == 0.
+    """
+    input: 
+        vcf = ancient("results/{refGenome}/{prefix}_raw.vcf.gz"),
+        include = ancient("results/{refGenome}/{prefix}_samps.txt")
+    output:
+        filtered = "results/{refGenome}/{prefix}_filtered.vcf.gz",
+        filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
+    conda:
+        "envs/filter.yml"
+    shell:
+        """
+        bcftools view -S ^{input.include} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+        bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered}
+        bcftools index {output.filtered}
+        """
+
+rule update_bed:
+    """
+    Updates callable sites bed file to add contigs less than threshold to regions to exclude
+    """
+    input:
+        bed = ancient("results/{refGenome}/{prefix}_callable_sites.bed"),
+        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai")
+    output:
+        bed = "results/{refGenome}/postprocess/{prefix}_exclude_sites.bed",
+        tmp2_bed = "results/{refGenome}/postprocess/{prefix}_tmp2.bed"
+    conda:
+        "envs/bed.yml"
+    params:
+        size_filter = config["contig_size"],
+    shell:
+        """
+        awk 'BEGIN{{OFS="\\t"}}{{if ($2<{params.size_filter}) {{print $1,0,$2}}}}' {input.fai} > {output.tmp2_bed}
+        cat {output.tmp2_bed} {input.bed} | bedtools sort -i - | bedtools merge -i - > {output.bed}
+        """
+
+rule strict_filter:  
+    input: 
+        bed = ancient("results/{refGenome}/postprocess/{prefix}_exclude_sites.bed"),
+        vcf = ancient("results/{refGenome}/{prefix}_filtered.vcf.gz"),
+        filtidx = ancient("results/{refGenome}/{prefix}_filtered.vcf.gz.csi")
+    output: 
+        vcf = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz"),
+        idx = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi")
+    conda:
+        "envs/filter.yml"
+    params:
+        miss = config["missingness"],
+        maf = config["maf"],
+        chr_ex = config["scaffolds_to_exclude"]
+    shell:
+        """
+        if [ -z "{params.chr_ex}" ]
+        then
+            bcftools view -R {input.bed} -m2 -M2 \
+            -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
+            {input.vcf} -O u -o {output.vcf}
+        else
+            bcftools view -t ^{params.chr_ex} -R {input.bed} -m2 -M2 \
+            -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
+            {input.vcf} -O u -o {output.vcf} 
+        fi
+        bcftools index {output.vcf}
+        """
+
+rule subset_indels:
+    """
+    Produce a clean vcf with only indels variants.
+    """
+    input: 
+        vcf = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz",
+        idx = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi",
+    output: 
+        vcf = "results/{refGenome}/{prefix}_clean_indels.vcf.gz",
+        idx = "results/{refGenome}/{prefix}_clean_indels.vcf.gz.tbi"
+    conda:
+        "envs/filter.yml"
+    log:
+        "logs/{refGenome}/postprocess/{prefix}_subset_indels.txt"
+    shell:
+        """
+        bcftools view -v indels -O z -o {output.vcf} {input.vcf}
+        bcftools index -t {output.vcf}
+        """
+
+rule subset_snps:
+    """
+    Produce a clean vcf with only simple snps.
+    """
+    input: 
+        vcf = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz",
+        idx = "results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi"
+    output: 
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        idx = "results/{refGenome}/{prefix}_clean_snps.vcf.gz.tbi"
+    conda:
+        "envs/filter.yml"    
+    log:
+        "logs/{refGenome}/postprocess/{prefix}_subset_snps.txt"
+    shell:
+        """
+        bcftools view -v snps -e 'TYPE ~ "indel"' -O z -o {output.vcf} {input.vcf}
+        bcftools index -t {output.vcf}
+        """

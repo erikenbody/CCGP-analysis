@@ -1,0 +1,81 @@
+def extract_scaffolds(filepath):
+    with open(filepath, 'r') as file:
+        scaffolds = [line.split()[0] for line in file if int(line.split()[1]) > 1000000]
+    return scaffolds
+
+def get_local_pcas(wc):
+    scaffs = extract_scaffolds(f"results/{wc.refGenome}/data/genome/{wc.refGenome}.fna.fai")
+    #scaffs = extract_scaffolds(f"results/{wc.refGenome}/data/genome/test.fai")
+    #out = expand("results/{refGenome}/local_pca/bcf_subsets/{scaff}/{prefix}_{scaff}.bcf", scaff=scaffs, **wc)
+    out = expand("results/{refGenome}/local_pca/lostruct_results/type_SNP_size_100_weights_none_jobid_{prefix}_{scaff}/{scaff}.pca.csv", scaff=scaffs, **wc)
+    return out
+    
+rule local_test:
+    input: get_local_pcas
+    output: touch("results/{refGenome}/local_pca/{prefix}_done.txt")
+
+rule index:
+    input:
+        pruned = "results/{refGenome}/QC/{prefix}.pruned.vcf.gz"
+    output:
+        idx = "results/{refGenome}/QC/{prefix}.pruned.vcf.gz.csi"
+    conda:
+        "envs/bcftools.yml"
+    shell:
+        """
+        bcftools index {input.pruned}
+        """
+
+rule install_lostruct:
+    input:
+        pruned = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+    output:
+        touch("results/{refGenome}/local_pca/{prefix}_install.txt")
+    conda:
+        "envs/lostruct.yml"
+    script:
+        "scripts/install_lostruct.R"
+
+rule subset_bcf:
+    input:
+        pruned = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        idx = "results/{refGenome}/{prefix}_clean_snps.vcf.gz.tbi"
+    output:
+        "results/{refGenome}/local_pca/bcf_subsets/{scaff}/{prefix}_{scaff}.bcf.csi",
+        "results/{refGenome}/local_pca/bcf_subsets/{scaff}/{prefix}_{scaff}.bcf"
+    conda:
+        "envs/bcftools.yml"
+    shell:
+        """
+        SCAFF={wildcards.scaff}
+
+        bcftools view --regions $SCAFF -O b -o results/{wildcards.refGenome}/local_pca/bcf_subsets/{wildcards.scaff}/{wildcards.prefix}_{wildcards.scaff}.bcf {input.pruned}
+        bcftools index results/{wildcards.refGenome}/local_pca/bcf_subsets/{wildcards.scaff}/{wildcards.prefix}_{wildcards.scaff}.bcf
+        """
+ 
+
+ ## At the moment, this script wont work if you switch it out to bp or a diff window size. Need to figure out how to dynamically change the output name
+ ## can put in params.type etc, but then cant use the rule all code up above to populate the wildcards
+rule run_lostruct:
+    input:
+        "results/{refGenome}/local_pca/bcf_subsets/{scaff}/{prefix}_{scaff}.bcf",
+        "results/{refGenome}/local_pca/bcf_subsets/{scaff}/{prefix}_{scaff}.bcf.csi",
+        samples = "results/{refGenome}/QC/{prefix}.samps.txt",
+        tmpfile = "results/{refGenome}/local_pca/{prefix}_install.txt"
+    params:
+        "results/{refGenome}/local_pca/bcf_subsets/{scaff}/",
+        type = "SNP",
+        size = 100,
+        k = 2,
+        nmds = 2,
+        scaff = "{scaff}",
+        ref = "{refGenome}",
+        prefix = "{prefix}"
+    output:
+        "results/{refGenome}/local_pca/lostruct_results/type_SNP_size_100_weights_none_jobid_{prefix}_{scaff}/{scaff}.pca.csv",
+        "results/{refGenome}/local_pca/lostruct_results/type_SNP_size_100_weights_none_jobid_{prefix}_{scaff}/{scaff}.regions.csv",
+        "results/{refGenome}/local_pca/lostruct_results/type_SNP_size_100_weights_none_jobid_{prefix}_{scaff}/mds_coords.csv"
+    conda:
+        "envs/lostruct.yml"
+    script:
+        "scripts/run_lostruct.R"
