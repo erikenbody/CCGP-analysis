@@ -13,17 +13,33 @@ suppressMessages({
   library(peakRAM)
 })
 
+#set up log file writing
+log_smk <- function() {
+  if (exists("snakemake") & length(snakemake@log) != 0) {
+    log <- file(snakemake@log[1][[1]], open = "wt")
+    sink(log, append = TRUE)
+    sink(log, append = TRUE, type = "message")
+  }
+}
+
+log_smk()
 
 # example call: `Rscript TESS_rancor.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" TRUE 1:5 "outputs/TESS/"`
 
-devtools::install_github("bcm-uga/TESS3_encho_sen")
-devtools::install_github("AnushaPB/wingen")
-devtools::install_github("TheWangLab/algatr")
+if (!require("algatr", character.only = TRUE)) {
+  # Install the package if not installed
+  devtools::install_github("TheWangLab/algatr")
+}
 
-suppressMessages(library(algatr))
-suppressMessages(library(wingen))
-suppressMessages(library(tess3r))
+if (!require("wingen", character.only = TRUE)) {
+  # Install the package if not installed
+  devtools::install_github("AnushaPB/wingen")
+}
 
+if (!require("tess3r", character.only = TRUE)) {
+  # Install the package if not installed
+  devtools::install_github("bcm-uga/TESS3_encho_sen")
+}
 #!/usr/bin/env Rscript # leave line commented
 
 species = snakemake@params[[1]]
@@ -108,10 +124,10 @@ peakRAM_tess <-
 
 # Krige Q values ----------------------------------------------------------
 
-peakRAM_krig <-
-  peakRAM::peakRAM(
-    krig_admix <- algatr::tess_krig(results$qmat, dat$coords, results$krig_raster)
-  )
+# peakRAM_krig <-
+#   peakRAM::peakRAM(
+#     krig_admix <- algatr::tess_krig(results$qmat, dat$coords, results$krig_raster)
+#   )
 
 
 # Export results ----------------------------------------------------------
@@ -129,6 +145,8 @@ export_TESS <- function(dat, results) {
         return(pops)
       }) %>% 
       dplyr::bind_rows()
+
+    qvals$best_k = unique(results$bestK)
     
     readr::write_csv(qvals,
                      file = paste0(output_path, species, "_TESS_qmatrix.csv"),
@@ -143,9 +161,9 @@ export_TESS <- function(dat, results) {
   }
   
   # Export raster of kriged Q values
-  terra::writeRaster(krig_admix,
-                     paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
-                     overwrite = TRUE)
+  # terra::writeRaster(krig_admix,
+  #                    paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
+  #                    overwrite = TRUE)
   
   # Export cross-entropy values for all K values
   x <- results$tess3_obj
@@ -186,9 +204,10 @@ peakRAM_exp <-
 RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
                         as.data.frame(peakRAM_dos),
                         as.data.frame(peakRAM_tess),
-                        as.data.frame(peakRAM_krig),
+                        #as.data.frame(peakRAM_krig),
                         as.data.frame(peakRAM_exp)) %>% 
-  dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
+  #dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
+  dplyr::mutate(fxn = c("import", "dosage", "run", "export"))
 
 readr::write_csv(RAM,
                  file = paste0(output_path, species, "_TESS_peakRAM.csv"))
