@@ -1,9 +1,28 @@
-import os
 
 
-rule alagtr_tess:
+rule plink_pca:
     """
-    call alagtr tess 
+    Call plink PCA. Needed for input to RDA analysis
+    """
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+    params:
+        prefix = "results/{refGenome}/algatr/{prefix}"
+    output: 
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        eigenval = "results/{refGenome}/algatr/{prefix}.eigenval",
+    conda:
+        "envs/plink.yml"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    shell:
+        """
+        plink2 --vcf {input.vcf} --pca 10 --out {params.prefix} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
+        """
+        
+rule algatr_tess:
+    """
+    call algatr tess 
     """
     input:
         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
@@ -26,14 +45,13 @@ rule alagtr_tess:
     output: 
     # Exported files are as follows:
         tess1 = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
-        tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
+        #tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
         tess4 = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
         tess5 = "results/{refGenome}/algatr/{prefix}_TESS_peakRAM.csv"
     conda:
         "envs/tess.yml"
     script:
-        "scripts/TESS_cloud.R"
-
+        "scripts/TESS_cloud.R" 
 
 rule generate_index:
     input:
@@ -42,7 +60,6 @@ rule generate_index:
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
     shell:
         "bcftools index {input.vcf}"
-
 
 rule seperate_vcf:
     input:
@@ -56,17 +73,16 @@ rule seperate_vcf:
     shell:
          "bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}"
 
-
-
-
-rule alagtr_RDA:
+rule algatr_RDA:
     """
-    call alagtr tess 
+    call algatr tess 
     """
     input:
         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
-        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
     params:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
@@ -76,9 +92,9 @@ rule alagtr_RDA:
         impute = "simple",
         kvals = "1:10",
         correctGEO = "false",
-        correctPC = "false",
-        nPC = 3,
-        model = "best", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        nPC = 10,
+        model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
         sig = 0.01, # only for outlier_method = "p"
         z = 3, # only for outlier_method = "z"
         Pin = 0.05,
@@ -97,7 +113,55 @@ rule alagtr_RDA:
     output: 
         #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
         impute = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt", 
-        anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv",
+        #anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv", #uncomment this later, but this file isnt appearing
+        #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
+        #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
+        #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
+        #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+    conda:
+        "envs/rda.yml"
+    script:
+        "scripts/RDA_cloud.R"
+
+rule algatr_RDA_pruned:
+    """
+    call algatr tess on a pruned dataset
+    """
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        output_path = "results/{refGenome}/algatr/",
+        rmislands = "false",
+        pruned = "true",
+        impute = "simple",
+        kvals = "1:10",
+        correctGEO = "false",
+        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        nPC = 10,
+        model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+        sig = 0.01, # only for outlier_method = "p"
+        z = 3, # only for outlier_method = "z"
+        Pin = 0.05,
+        R2permutations = 1000,
+        R2scope = "true",
+        p_adj = "fdr", # only if outlier_method = "p"
+        save_impute = "true",
+        intervals = "true",
+        scaff = "NA"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        log = "logs/{refGenome}/algatr/{prefix}.RDA.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/{prefix}.RDA.benchmark.txt",
+    output: 
+        #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
+        impute = "results/{refGenome}/algatr/{prefix}_imputed_simple.txt", 
+        #anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv", #uncomment this later, but this file isnt appearing
         #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
         #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
         #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
@@ -130,28 +194,124 @@ rule create_coords_sheet:
     script:
         "scripts/create_coord_sheet.py"
 
-rule wingen:
-    input:
-        pass
-    output:
-        pass
-    conda:
-        "envs/wingen.yml"
-    shell:
-        pass
-
-
-
 rule shapeit:
     input:
         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
     output:
-        haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.vcf.gz"
+        haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf"
     conda:
-        "envs/wingen.yml"
+        "envs/shapeit.yml"
+    log:
+        stderr = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.err",
+        stdout = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.out"
     shell:
-        "shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
+        #"shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
+        """
+        bcftools index -f {input.scaf}
+        SHAPEIT5_phase_common --input {input.scaf} --region {wildcards.scaff} --output {output.haplo} --thread 8 > {log.stdout} 2> {log.stderr}
+        """
 
+rule concat_shapeit:
+    input:
+        haplo = expand("results/{{refGenome}}/algatr/haplotypes/{{prefix}}_{scaff}_phased.bcf", scaff=get_scaffolds(fai))
+    output:
+        haplo = "results/{refGenome}/algatr/{prefix}_shapeit5_phased.bcf"
+    conda:
+        "envs/shapeit.yml"
+    shell:
+        "bcftools concat -O z -o {output.haplo} {input.haplo}"
     
+rule distinguish_populations:
+    input:
+        matrix = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv"
+    output:
+        "results/{refGenome}/algatr/{prefix}_populations-done.txt"
+    conda:
+        "envs/assign_pops.yml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        manual_k_assignment = "NA"
+    script:
+        "scripts/population_assignment.py"
+    
+rule bcf_populations:
+    input:
+        pops = "results/{refGenome}/algatr/{prefix}_populations/population_{k}.txt",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+    output:
+        pop_vcf = "results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz"
+    conda:
+        "envs/shapeit.yml"
+    shell:
+        """
+        bcftools view -S {input.pops} -Oz -o {output.pop_vcf} {input.vcf}
+        """
+
+rule pi_populations:
+    input:
+        pop_vcf = "results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz",
+        bed = "results/{refGenome}/{prefix}_callable_sites.bed"
+    output:
+        pi = "results/{refGenome}/algatr/{prefix}_population_pi/pi_population_{k}.csv"
+    conda:
+        "envs/pi.yaml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        k_value = "{k}"
+    script:
+        "scripts/calculate_pi.py"
+
+
+rule roh_pop:
+    input:
+        pop_vcf = ancient("results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz"),
+    output:
+        roh = "results/{refGenome}/algatr/{prefix}_roh/population_{k}.roh.gz",
+        rg = "results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh"
+    conda:
+        "envs/roh.yml"
+    resources:
+       mem_mb = 128000,
+       threads = 10
+    shell:
+        """
+        bcftools roh --estimate-AF GT,- --threads 10 -G30 -O z -o {output.roh} {input.pop_vcf}
+        zgrep RG {output.roh} > {output.rg}
+        """
+
+
+rule get_chromosome_names:
+    input:
+        contigs = "results/{refGenome}/algatr/{prefix}_contigs.tsv"
+    output:
+        renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt"
+    conda:
+        "envs/assign_pops.yml"
+    params:
+        project_id = "{prefix}"
+    script:
+        "scripts/get_chromosome_names.py"
+
+
+rule rename_chromosomes:
+    input:
+        renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt",
+        snp_vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz"
+    output:
+        renamed_snp_vcf = "results/{refGenome}/algatr/{prefix}_renamed_clean_snps.vcf.gz"
+    shell:
+        "bcftools annotate --rename-chrs {input.renamed} {input.snp_vcf} -Oz -o {output.renamed_snp_vcf}"
+
+        
+
+
+
+
+        
+
+

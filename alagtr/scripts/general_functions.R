@@ -22,7 +22,7 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   #coords <- readr::read_tsv(paste0(data_path, "QC/", species, ".coords.txt", sep = ""), col_names = FALSE)
   coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
   colnames(coords) <- c("INDV", "x", "y")
-
+  print(coords)
   # Get input data ----------------------------------------------------------
   if (analysis == "gendist") {
     if (!pruned) {
@@ -138,3 +138,16 @@ get_envlayers <- function(env_path, rmislands = FALSE){
   
   return(envlayers)
 }
+
+#' Convert from data frame to formatted sp
+#'
+#' @param coords sf object or matrix representing coordinates
+#'
+#' @return converted coords in sp format
+#' @export
+# coords_to_df <- function(coords) {
+#   if (inherits(coords, "sf")) coords <- sf::st_coordinates(coords)
+#   if (is.matrix(coords)) coords <- data.frame(coords)
+#   colnames(coords) <- c("x", "y")
+#   return(coords)
+# }

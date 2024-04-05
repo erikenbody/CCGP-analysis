@@ -33,7 +33,7 @@ def mongo_get_coords(project, ref_genome, sample_names, vcf_samples):
         lat = sample.get("lat", "")
         long = sample.get("long", "")
 
-        data_list.append({"Sample Name": sample_name, "Lat": lat, "Long": long})
+        data_list.append({"Sample Name": sample_name, "Long": long, "Lat": lat})
         print(sample_name)
     
     df = pd.DataFrame(data_list)
