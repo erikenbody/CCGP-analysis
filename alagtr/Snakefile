@@ -1,4 +1,73 @@
+from pathlib import Path
 
+rule get_vcf_samples:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+    output:
+        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+    shell:
+        "bcftools query -l {input.vcf} > {output.samps}"
+
+rule create_coords_sheet:
+    input:
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+    output:
+        samps_w_coord = "results/{refGenome}/algatr/{prefix}.coords.txt",
+        exclude_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+    conda:
+        "envs/mongo.yml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        sample_id = config["sample_id"]
+    script:
+        "scripts/create_coord_sheet_revised.py"
+
+rule remove_samps_no_coords:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        vcfidx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
+        
+        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+    output:
+        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi"
+    conda:
+        "envs/shapeit.yml"
+    shell:
+        """
+        if [ ! -s {input.excluded_samps} ]; then
+            cp {input.vcf} {output.filtered_no_coords}
+            cp {input.vcfidx} {output.filtidx_no_coords}
+        else
+            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+            bcftools index {output.filtered_no_coords}
+        fi
+        """
+
+rule remove_samps_no_coords_full:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+        vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+    output:
+        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+    conda:
+        "envs/shapeit.yml"
+    shell:
+        """
+        if [ ! -s {input.excluded_samps} ]; then
+            cp {input.vcf} {output.filtered_no_coords}
+            cp {input.vcfidx} {output.filtidx_no_coords}
+        else
+            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+            bcftools index {output.filtered_no_coords}
+        fi
+        """
 
 rule plink_pca:
     """
@@ -27,8 +96,10 @@ rule algatr_tess:
     input:
         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
-        pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
-        coords = "results/{refGenome}/QC/{prefix}.coords.txt",
+        #pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #this doesnt have samples with coordinates removed included
+        pruned = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",#vcf with samples with missing coordinates removed
+        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+        #coords = "results/{refGenome}/QC/{prefix}.coords.txt",
         coords2 = "results/{refGenome}/algatr/{prefix}.coords.txt" #this should exist when it is made
     params:
         species = config['final_prefix'],
@@ -56,6 +127,7 @@ rule algatr_tess:
 rule generate_index:
     input:
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+        
     output:
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
     shell:
@@ -63,11 +135,14 @@ rule generate_index:
 
 rule seperate_vcf:
     input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
-        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
+        #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
     output:
         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
+        
     log:
         "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.scaff.txt"
     shell:
@@ -128,7 +203,9 @@ rule algatr_RDA_pruned:
     call algatr tess on a pruned dataset
     """
     input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
     params:
@@ -171,34 +248,15 @@ rule algatr_RDA_pruned:
     script:
         "scripts/RDA_cloud.R"
 
-rule get_vcf_samples:
-    input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
-    output:
-        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
-    shell:
-        "bcftools query -l {input.vcf} > {output.samps}"
 
-rule create_coords_sheet:
-    input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
-    output:
-        "results/{refGenome}/algatr/{prefix}.coords.txt"
-    conda:
-        "envs/mongo.yml"
-    params:
-        project_id = "{prefix}",
-        ref_genome = "{refGenome}",
-        sample_id = config["sample_id"]
-    script:
-        "scripts/create_coord_sheet.py"
 
 rule shapeit:
     input:
         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
-        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
     output:
         haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf"
     conda:
@@ -222,18 +280,45 @@ rule concat_shapeit:
         "envs/shapeit.yml"
     shell:
         "bcftools concat -O z -o {output.haplo} {input.haplo}"
+
+def get_k(wc):
+    pops = checkpoints.distinguish_populations.get(**wc).output[1]
+    k_values = []
     
-rule distinguish_populations:
+    pops_dir = Path(pops)
+    
+    
+    if pops_dir.is_dir():
+        
+        files = [file.name for file in pops_dir.iterdir() if file.is_file()]
+        
+        k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
+    out = [*expand("results/{refGenome}/algatr/{prefix}_populations/population_{k}.txt", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz.csi", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.roh.gz", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_merged_roh/population_{k}.rg.roh", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_filtered_population_{k}.froh", **wc, k=k_values),
+        *expand("results/{refGenome}/algatr/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values)
+    ]
+    
+    return out
+    
+checkpoint distinguish_populations:
     input:
         matrix = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv"
     output:
-        "results/{refGenome}/algatr/{prefix}_populations-done.txt"
+        pops_done = "results/{refGenome}/algatr/{prefix}_populations-done.txt",
+        outdir = directory("results/{refGenome}/algatr/{prefix}_populations")
+        
     conda:
         "envs/assign_pops.yml"
     params:
         project_id = "{prefix}",
         ref_genome = "{refGenome}",
-        manual_k_assignment = "NA"
+        manual_k_assignment = "NA",
+        threshold_qval = 0.80
     script:
         "scripts/population_assignment.py"
     
@@ -242,13 +327,17 @@ rule bcf_populations:
         pops = "results/{refGenome}/algatr/{prefix}_populations/population_{k}.txt",
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        pops_done = ancient("results/{refGenome}/algatr/{prefix}_populations-done.txt")
     output:
-        pop_vcf = "results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz"
+        pop_vcf = "results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz",
+        index = "results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz.csi"
     conda:
         "envs/shapeit.yml"
     shell:
         """
-        bcftools view -S {input.pops} -Oz -o {output.pop_vcf} {input.vcf}
+        bcftools view -S {input.pops} -Ou -a -U {input.vcf} | bcftools +fill-tags -Ou |
+        bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.pop_vcf}
+        bcftools index {output.pop_vcf}
         """
 
 rule pi_populations:
@@ -280,11 +369,44 @@ rule roh_pop:
        threads = 10
     shell:
         """
-        bcftools roh --estimate-AF GT,- --threads 10 -G30 -O z -o {output.roh} {input.pop_vcf}
+        bcftools roh --threads 10 -G30 -Oz -o {output.roh} {input.pop_vcf}
         zgrep RG {output.roh} > {output.rg}
         """
 
+rule merge_roh:
+    input:
+        rg = "results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh"
+    output:
+        merged_rg = "results/{refGenome}/algatr/{prefix}_merged_roh/population_{k}.rg.roh"
+    conda:
+        "envs/roh.yml"
+    params:
+        gap_size = 10000
+    script:
+        "scripts/merge_roh.py"
 
+
+rule froh_2:
+    input:
+        rg = ancient("results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh"),
+        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai"),
+    output:
+        froh = "results/{refGenome}/algatr/{prefix}_filtered_population_{k}.froh",
+        top = "results/{refGenome}/algatr/{prefix}_filtered_population_{k}_top.froh"
+    conda:
+        "envs/froh.yml"
+    params:
+        population = "{k}",
+        interval_width = 25
+    script:
+        "scripts/froh.py"
+
+rule get_k_files:
+    # dummy rule to get all of the files split by k pops
+    input: get_k
+    output: touch("results/{refGenome}/algatr/{prefix}/k.done")
+
+        
 rule get_chromosome_names:
     input:
         contigs = "results/{refGenome}/algatr/{prefix}_contigs.tsv"
@@ -297,21 +419,173 @@ rule get_chromosome_names:
     script:
         "scripts/get_chromosome_names.py"
 
-
+# This is good.
 rule rename_chromosomes:
     input:
-        renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt",
-        snp_vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz"
+        #renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt",
+        #snp_vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     output:
-        renamed_snp_vcf = "results/{refGenome}/algatr/{prefix}_renamed_clean_snps.vcf.gz"
+        #renamed_snp_vcf = "results/{refGenome}/algatr/{prefix}_renamed_clean_snps.vcf.gz",
+        chrom_names = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.txt"
+    conda:
+        "envs/roh.yml"
+    params:
+        chrom_num = 2
     shell:
-        "bcftools annotate --rename-chrs {input.renamed} {input.snp_vcf} -Oz -o {output.renamed_snp_vcf}"
+        '''
+        awk 'NR<={params.chrom_num} {{print $1}}' {input.fai} > {output.chrom_names} 
+        '''
+        # '''
+        # bcftools annotate --rename-chrs {input.renamed} {input.snp_vcf} -Oz -o {output.renamed_snp_vcf}
+        # awk 'NR<=10 {{print $1}}' {input.fai} > {output.chrom_names}
+        # '''
+#this is good
+rule annotate_vcf:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+    output:
+        vcf_ap = "results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz"
+    conda:
+        "envs/roh.yml"
+    shell:
+        """
+        bcftools annotate --set-id '%CHROM\_%POS\_%REF\_%FIRST_ALT' -Oz -o {output.vcf_ap} {input.vcf}
+        """
+
+rule GONE_vcf:
+    input:
+        chrom_names = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.txt",
+        vcf_ap = "results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz"
+    output:
+        GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz",
+        
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools view -t $(cat {input.chrom_names} | tr '\n' ',') -Oz -o {output.GONE_vcf} {input.vcf_ap}
+        '''
+
+rule plink_bed:
+    input:
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        #vcf_ap = "results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz",
+        GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz"
+
+    output:
+        # mapp = "results/{refGenome}/CCGP/{prefix}_plink.map",
+        # ped = "results/{refGenome}/CCGP/{prefix}_plink.ped"
+        plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt"
+
+    params:
+        plink_out = "results/{refGenome}/CCGP/plink/{prefix}_plink"
+    conda:
+        "envs/plink1_9.yml"
+    shell:
+        '''
+        plink --vcf {input.GONE_vcf} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
+        touch {output.plink_done}
+        '''
 
         
+rule plink_map:
+    input:
+        plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt"
+    output:
+        plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+        plink_map_temp = "results/{refGenome}/CCGP/plink/{prefix}_plink_ORIG.map"
+    params:
+        plink_out = "results/{refGenome}/CCGP/plink/{prefix}_plink"
+    conda:
+        "envs/plink1_9.yml"
+    shell:
+        '''
+        plink --bfile {params.plink_out} --recode --out {params.plink_out} --allow-extra-chr
+        mv {params.plink_out}.map {output.plink_map_temp}
+        touch {output.plink_map_done}
+        '''
 
 
-
-
+rule rename_chrom_plink:
+    input:
+        map_temp = "results/{refGenome}/CCGP/plink/{prefix}_plink_ORIG.map",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+    output:
+        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map"
+    script:
+        "scripts/rename_map.py"
         
+    
+
+# rule GONE:
+#     input:
+#         #mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
+#         #ped = "results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
+#         plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+#         #GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz"
+#     output:
+#         GONE_done = "results/{refGenome}/CCGP/GONE/{prefix}_done.txt"
+#     params:
+#         #GONE_out = "results/{refGenome}/CCGP/GONE/{prefix}_gone",
+#         script_dir = "/scratch2/erik/CCGP-reruns/GONE/Linux/script_GONE.sh",
+#         plink_out = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink",
+
+#     shell:
+#         '''
+#         bash {params.script_dir} {params.plink_out} 
+#         touch {output.GONE_done}
+#         '''
+
+rule get_GONE:
+    input:
+        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map"
+    output:
+        #map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
+    params:
+        GONE_dwn_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE",
+        map_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.map",
+        ped_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
+        GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux"
+
+    shell:
+        '''
+        git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}
+        cp {params.map_dir} {params.GONE_dir}
+        cp {params.ped_dir} {params.GONE_dir}
+        chmod -R +x {params.GONE_dwn_dir}
+        touch {output.GONE_downloaded}
+        '''
+
+        # if [ -d {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh ]; then
+        #     echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh already exists."
+        # else
+        #     echo "Directory {params.GONE_dwn_dir}/Linux/GONE_script.sh does not exist. Cloning the GONE repository."
+        #     git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
+        # fi
+        # cp {params.map_dir} {params.GONE_dir}
+        # cp {params.ped_dir} {params.GONE_dir}
+        # chmod -R +x {params.GONE_dwn_dir}/GONE
+        # touch {output.GONE_downloaded}
+rule run_GONE:
+    input:
+        #map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
+    output:
+        GONE_out_d2 = "results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink",
+        GONE_out_Ne = "results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink",
+        GONE_output = "results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink",
+    params:
+        GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux",
+        parent_dir = "/scratch2/erik/CCGP-reruns",
+        ccgp_id = '{prefix}_plink'
+    shell:
+        '''
+        cd {params.GONE_dir} 
+        bash script_GONE.sh {params.ccgp_id}
+        '''
 
 

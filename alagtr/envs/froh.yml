@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - gzip
+  - psutil
+  - pandas==2.1.4

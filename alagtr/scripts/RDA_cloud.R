@@ -43,7 +43,7 @@ scaff = as.character(snakemake@params[[20]])
 # Check if the package is already installed
 if (!require("algatr", character.only = TRUE)) {
   # Install the package if not installed
-  devtools::install_github("TheWangLab/algatr")
+  devtools::install_github("TheWangLab/algatr", quiet = T)
 }
 
 # Load the package

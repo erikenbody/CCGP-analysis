@@ -22,6 +22,10 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   #coords <- readr::read_tsv(paste0(data_path, "QC/", species, ".coords.txt", sep = ""), col_names = FALSE)
   coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
   colnames(coords) <- c("INDV", "x", "y")
+  coords$x <- as.numeric(coords$x)
+  coords$y <- as.numeric(coords$y)
+  #coords <- coords %>% filter(!is.na(x)) #remove coordinates with missing data. this breaks other things
+
   print(coords)
   # Get input data ----------------------------------------------------------
   if (analysis == "gendist") {
@@ -51,7 +55,7 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
       #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.vcf.gz"))
       #use this to test out, much smaller file
       #gen <- vcfR::read.vcfR(paste0(data_path, "QC/", species, ".pruned.vcf.gz"))
-      gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_pruned_mil.vcf.gz"))
+      gen <- vcfR::read.vcfR(paste0(data_path, "algatr/", species, "_complete_coords_pruned_mil.vcf.gz"))
     }
     if (impute == "simple") {
       gen <- algatr::vcf_to_dosage(gen)
@@ -61,6 +65,13 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   }
   
   # Check coords and gendist IDs --------------------------------------------
+
+  # Filter gen object to include only individuals present in coords$INDV
+  # genID <- colnames(gen@gt[, -1])
+  # gen <- gen[, genID %in% coords$INDV]
+  # print(gen)
+  # print(gen[,"_E0044B"])
+
   dat <- check_ccgp_data(gen = gen, coords = coords, filetype = analysis)
   
   # Get envlayers -----------------------------------------------------------
@@ -99,7 +110,7 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
   overlap <- coords$INDV %in% genID
   if(!all(overlap)){warning("Missing genetic data for: ", paste(coords$INDV[!overlap]), ", removing coordinate data for these individuals...")}
   coordsF <- coords[overlap,]
-  
+
   overlap <- genID %in% coords$INDV
   if(!all(overlap)){stop("Missing coordinate data for: ", paste(genID[!overlap]))}
   

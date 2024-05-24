@@ -6,8 +6,8 @@ rule basic_filter:
     sites with reference equal to N or alt equal to ., and sites with AF == 0.
     """
     input: 
-        vcf = ancient("results/{refGenome}/{prefix}_raw.vcf.gz"),
-        include = ancient("results/{refGenome}/{prefix}_samps.txt")
+        vcf = "results/{refGenome}/{prefix}_raw.vcf.gz",
+        include = "results/{refGenome}/{prefix}_samps.txt"
     output:
         filtered = "results/{refGenome}/{prefix}_filtered.vcf.gz",
         filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
@@ -25,8 +25,8 @@ rule update_bed:
     Updates callable sites bed file to add contigs less than threshold to regions to exclude
     """
     input:
-        bed = ancient("results/{refGenome}/{prefix}_callable_sites.bed"),
-        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai")
+        bed = "results/{refGenome}/{prefix}_callable_sites.bed",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     output:
         bed = "results/{refGenome}/postprocess/{prefix}_exclude_sites.bed",
         tmp2_bed = "results/{refGenome}/postprocess/{prefix}_tmp2.bed"
@@ -42,9 +42,9 @@ rule update_bed:
 
 rule strict_filter:  
     input: 
-        bed = ancient("results/{refGenome}/postprocess/{prefix}_exclude_sites.bed"),
-        vcf = ancient("results/{refGenome}/{prefix}_filtered.vcf.gz"),
-        filtidx = ancient("results/{refGenome}/{prefix}_filtered.vcf.gz.csi")
+        bed = "results/{refGenome}/postprocess/{prefix}_exclude_sites.bed",
+        vcf = "results/{refGenome}/{prefix}_filtered.vcf.gz",
+        filtidx = "results/{refGenome}/{prefix}_filtered.vcf.gz.csi"
     output: 
         vcf = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz"),
         idx = temp("results/{refGenome}/postprocess/{prefix}_filtered.TEMP.vcf.gz.csi")
@@ -60,11 +60,11 @@ rule strict_filter:
         then
             bcftools view -R {input.bed} -m2 -M2 \
             -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
-            {input.vcf} -O u -o {output.vcf}
+            {input.vcf} -O z -o {output.vcf}
         else
             bcftools view -t ^{params.chr_ex} -R {input.bed} -m2 -M2 \
             -e 'F_MISSING > {params.miss} | AF<{params.maf}' \
-            {input.vcf} -O u -o {output.vcf} 
+            {input.vcf} -O z -o {output.vcf} 
         fi
         bcftools index {output.vcf}
         """
