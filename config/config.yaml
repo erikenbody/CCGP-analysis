@@ -5,10 +5,11 @@
 resource_config: "config/resources.yaml" # path to resources yaml config
 final_prefix: "cali_small" # prefix for final output files
 refgenome: "GCA_023055505.1"
-bed: False
+bed: True
 trackhub_email: erik.enbody@gmail.com
 grid: "/scratch2/erik/ccgp_feems/california_grid.txt"
 sample_id: "minicore_seq_id"
+rename_contigs: False
 ##############################
 # Variables you *might* need to change
 ##############################

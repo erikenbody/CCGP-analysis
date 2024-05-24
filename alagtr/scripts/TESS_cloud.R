@@ -28,17 +28,17 @@ log_smk()
 
 if (!require("algatr", character.only = TRUE)) {
   # Install the package if not installed
-  devtools::install_github("TheWangLab/algatr")
+  devtools::install_github("TheWangLab/algatr", quiet = T)
 }
 
 if (!require("wingen", character.only = TRUE)) {
   # Install the package if not installed
-  devtools::install_github("AnushaPB/wingen")
+  devtools::install_github("AnushaPB/wingen", quiet = T)
 }
 
 if (!require("tess3r", character.only = TRUE)) {
   # Install the package if not installed
-  devtools::install_github("bcm-uga/TESS3_encho_sen")
+  devtools::install_github("bcm-uga/TESS3_encho_sen", quiet = T)
 }
 #!/usr/bin/env Rscript # leave line commented
 
@@ -73,7 +73,6 @@ peakRAM_imp <-
                              impute = "none",
                              rmislands = rmislands)
   )
-
 
 # Convert to dosage matrix ------------------------------------------------
 

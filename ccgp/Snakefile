@@ -4,7 +4,7 @@ include: "common.smk"
 
 rule roh:
     input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
     output:
         roh = "results/{refGenome}/CCGP/{prefix}.roh.gz",
         rg = "results/{refGenome}/CCGP/{prefix}.rg.roh"
@@ -21,8 +21,8 @@ rule roh:
 
 rule froh:
     input:
-        roh = ancient("results/{refGenome}/CCGP/{prefix}.rg.roh"),
-        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai"),
+        roh = "results/{refGenome}/CCGP/{prefix}.rg.roh",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
     output:
         froh = "results/{refGenome}/CCGP/{prefix}_filtered.froh",
         top = "results/{refGenome}/CCGP/{prefix}_filtered_top.froh"
@@ -31,8 +31,8 @@ rule froh:
 
 rule pi:
     input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
-        top = ancient("results/{refGenome}/CCGP/{prefix}_filtered_top.froh")
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        top = "results/{refGenome}/CCGP/{prefix}_filtered_top.froh"
     output:
         pi1 = "results/{refGenome}/CCGP/{prefix}.1.windowed.pi",
         pi2 = "results/{refGenome}/CCGP/{prefix}.2.windowed.pi",
@@ -65,18 +65,18 @@ rule qc_plots:
     Call plotting script
     """
     input:
-        top = ancient("results/{refGenome}/CCGP/{prefix}_filtered_top.froh"),
-        roh = ancient("results/{refGenome}/CCGP/{prefix}.rg.roh"),
-        pi1 = ancient("results/{refGenome}/CCGP/{prefix}.1.windowed.pi"),
-        pi2 = ancient("results/{refGenome}/CCGP/{prefix}.2.windowed.pi"),
-        pi3 = ancient("results/{refGenome}/CCGP/{prefix}.3.windowed.pi"),
-        pi4 = ancient("results/{refGenome}/CCGP/{prefix}.4.windowed.pi"),
-        pi5 = ancient("results/{refGenome}/CCGP/{prefix}.5.windowed.pi"),
-        pi6 = ancient("results/{refGenome}/CCGP/{prefix}.6.windowed.pi"),
-        pi7 = ancient("results/{refGenome}/CCGP/{prefix}.7.windowed.pi"),
-        pi8 = ancient("results/{refGenome}/CCGP/{prefix}.8.windowed.pi"),
-        pi9 = ancient("results/{refGenome}/CCGP/{prefix}.9.windowed.pi"),
-        pi10 = ancient("results/{refGenome}/CCGP/{prefix}.10.windowed.pi")
+        top = "results/{refGenome}/CCGP/{prefix}_filtered_top.froh",
+        roh = "results/{refGenome}/CCGP/{prefix}.rg.roh",
+        pi1 = "results/{refGenome}/CCGP/{prefix}.1.windowed.pi",
+        pi2 = "results/{refGenome}/CCGP/{prefix}.2.windowed.pi",
+        pi3 = "results/{refGenome}/CCGP/{prefix}.3.windowed.pi",
+        pi4 = "results/{refGenome}/CCGP/{prefix}.4.windowed.pi",
+        pi5 = "results/{refGenome}/CCGP/{prefix}.5.windowed.pi",
+        pi6 = "results/{refGenome}/CCGP/{prefix}.6.windowed.pi",
+        pi7 = "results/{refGenome}/CCGP/{prefix}.7.windowed.pi",
+        pi8 = "results/{refGenome}/CCGP/{prefix}.8.windowed.pi",
+        pi9 = "results/{refGenome}/CCGP/{prefix}.9.windowed.pi",
+        pi10 = "results/{refGenome}/CCGP/{prefix}.10.windowed.pi"
     params:
         prefix = lambda wc, input: input.roh[:-7]
     resources:
@@ -93,7 +93,7 @@ rule qc_plots:
 
 rule annotate:
     input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
     output:
         ann = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"
     conda:
@@ -105,7 +105,7 @@ rule annotate:
 
 rule plinkld:
     input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"
     output:
         ld = "results/{refGenome}/CCGP/{prefix}_0.3.prune.in",
         ld2 = "results/{refGenome}/CCGP/{prefix}_0.3.prune.out",
@@ -134,9 +134,9 @@ rule plinkld:
 
 rule prunevcf:
     input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        ld3 = ancient("results/{refGenome}/CCGP/{prefix}_0.3.prune.in"),
-        ld6 = ancient("results/{refGenome}/CCGP/{prefix}_0.6.prune.in")
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+        ld3 = "results/{refGenome}/CCGP/{prefix}_0.3.prune.in",
+        ld6 = "results/{refGenome}/CCGP/{prefix}_0.6.prune.in"
     output:
         pruned3 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz",
         pruned6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
@@ -153,9 +153,9 @@ rule plink:
     Call plink distance mat.
     """
     input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
-        pruned3 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz"),
-        pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz")     
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        pruned3 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz",
+        pruned6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"     
     params:
         prefix = lambda wc, input: input.pruned3.replace("_annotated_pruned_0.3.vcf.gz", "_filtered"),
         prefix3 = lambda wc, input: input.pruned3.replace(".vcf.gz", ""),
@@ -192,7 +192,7 @@ rule complete:
 
 rule vcf2dosage:
     input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
+        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
     output:
         dosage = "results/{refGenome}/CCGP/{prefix}_annotated_no_pruning_dosage.txt.gz",
     run:
@@ -200,7 +200,7 @@ rule vcf2dosage:
 
 rule vcf2dosage03:
     input:
-        pruned3 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz"),
+        pruned3 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz",
     output:
         dosage = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3_dosage.txt.gz",
     run:
@@ -208,7 +208,7 @@ rule vcf2dosage03:
 
 rule vcf2dosage06:
     input:
-        pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+        pruned6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
     output:
         dosage = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6_dosage.txt.gz",
     run:
@@ -226,6 +226,7 @@ rule mil_subsample_snps:
         filtered = "results/{refGenome}/CCGP/{prefix}_0.6_filtered.vcf.gz",
         filtered_idx = "results/{refGenome}/CCGP/{prefix}_0.6_filtered.vcf.gz.csi",
         pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        pruned_idx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
     conda:
         "envs/roh.yml"
     shell:

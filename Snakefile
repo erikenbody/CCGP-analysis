@@ -13,13 +13,7 @@ def get_scaffolds(fai):
                 scaffolds.append(scaffold)
     return scaffolds
 
-def get_k(pops):
-    k_values = []
-    if pops.is_dir():
-        files = [file.name for file in pops.iterdir() if file.is_file()]
-        k_values = [file.split("_")[1].split(".")[0] for file in files]
 
-    return k_values
 
 # rename_contigs = config["rename_chromosome"]
 # def get_chrom_names(contigs, output_contigs):
@@ -37,12 +31,6 @@ def get_k(pops):
 #         with open(output_contigs, 'w') as output_file:
 #             pass
 
-
-
-
-
-
-
 fai = Path("results", config["refgenome"], "data", "genome", config["refgenome"] + ".fna.fai")
 pops = Path("results", config["refgenome"], "algatr", config["final_prefix"] + "_populations")
 contigs = Path("results", config["refgenome"], "algatr", config["final_prefix"] + "_contigs.tsv")
@@ -52,6 +40,7 @@ output_contigs = Path("results", config["refgenome"], "algatr", config["final_pr
 output = [
         expand("results/{refGenome}/CCGP/{prefix}_roh_pi_ridges.pdf",refGenome=config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/CCGP/{prefix}_filtered.froh",refGenome=config['refgenome'], prefix=config['final_prefix']),
+        
         expand("results/{refGenome}/{prefix}_clean_snps.vcf.gz", refGenome=config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/{prefix}_clean_indels.vcf.gz", refGenome=config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3_dosage.txt.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -68,7 +57,10 @@ output = [
         
         # feems output, in progress
         #expand("results/{refGenome}/feems/{prefix}_pruned_0.6_cv.png", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        
+        # Algatr
         expand("results/{refGenome}/algatr/{prefix}.coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/algatr/{prefix}.no_coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}.samps4coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
@@ -84,10 +76,33 @@ output = [
         #expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_populations-done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        expand("results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
-        expand("results/{refGenome}/algatr/{prefix}_population_pi/pi_population_{k}.csv", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
-        expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
-        expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.roh.gz", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops))
+        expand("results/{refGenome}/algatr/{prefix}/k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        # expand("results/{refGenome}/algatr/{prefix}_population_vcf/population_{k}.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_population_pi/pi_population_{k}.csv", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.rg.roh", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_roh/population_{k}.roh.gz", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_filtered_population_{k}.froh", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_filtered_population_{k}_top.froh", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+        # expand("results/{refGenome}/algatr/{prefix}_merged_roh/population_{k}.rg.roh", refGenome = config['refgenome'], prefix=config['final_prefix'], k=get_k(pops)),
+       
+       
+       
+        # # GONE stuff.
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        # expand("results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        
+        #expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_download_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
+    
         
 ]
 if config["rename_contigs"]:
