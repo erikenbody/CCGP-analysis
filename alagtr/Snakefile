@@ -281,6 +281,8 @@ rule concat_shapeit:
     shell:
         "bcftools concat -O z -o {output.haplo} {input.haplo}"
 
+
+
 def get_k(wc):
     pops = checkpoints.distinguish_populations.get(**wc).output[1]
     k_values = []
@@ -311,7 +313,6 @@ checkpoint distinguish_populations:
     output:
         pops_done = "results/{refGenome}/algatr/{prefix}_populations-done.txt",
         outdir = directory("results/{refGenome}/algatr/{prefix}_populations")
-        
     conda:
         "envs/assign_pops.yml"
     params:
@@ -406,10 +407,6 @@ rule get_k_files:
     input: get_k
     output: touch("results/{refGenome}/algatr/{prefix}/k.done")
 
-
-
-
-        
 rule get_chromosome_names:
     input:
         contigs = "results/{refGenome}/algatr/{prefix}_contigs.tsv"
@@ -474,7 +471,6 @@ rule SNP_check:
     output:
         snp_positions = "results/{refGenome}/CCGP/plink/{prefix}_snp_positions.txt",
         GONE_csi = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz.csi"
-
     conda:
         "envs/roh.yml"
     shell:
@@ -549,22 +545,18 @@ rule rename_chrom_plink:
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     script:
         "scripts/rename_map.py"
-        
     
-
 rule get_GONE:
     input:
         mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
     output:
         map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
         ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
-        #GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux/GONE_script.sh"
-        #GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
     params:
-        GONE_dwn_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}",
-        map_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.map",
-        ped_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
-        GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux"
+        GONE_dwn_dir = "results/{refGenome}",
+        map_dir = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
+        ped_dir = "results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
+        GONE_dir = "results/{refGenome}/GONE/Linux"
 
     shell:
         '''
@@ -576,6 +568,7 @@ rule get_GONE:
             git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
             chmod -R +x {params.GONE_dwn_dir}/GONE
         fi
+        pwd
         cp {params.map_dir} {params.GONE_dir}
         cp {params.ped_dir} {params.GONE_dir}
         '''
@@ -584,14 +577,12 @@ rule run_GONE:
     input:
         map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
         ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
-        #GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
     output:
         GONE_out_d2 = "results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink",
         GONE_out_Ne = "results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink",
         GONE_output = "results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink",
     params:
-        GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux",
-        parent_dir = "/scratch2/erik/CCGP-reruns",
+        GONE_dir = "results/{refGenome}/GONE/Linux",
         ccgp_id = '{prefix}_plink'
     shell:
         '''
