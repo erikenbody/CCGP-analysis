@@ -1,6 +1,11 @@
 import sys
 import shutil
 
+'''
+This script converts scaffold names in a `.map` file to numeric chromosome identifiers based on their order in an input file. It creates a conversion dictionary from the input file, updates the `.map` file using this dictionary, and writes the result to an output file.
+'''
+
+
 def generate_mapping(input_file, map_file, output_file):
 
     conversion_dict = {}
@@ -25,7 +30,7 @@ def generate_mapping(input_file, map_file, output_file):
         for line in updated_lines:
             f.write(line + '\n')
 
-input_file = snakemake.input["fai"]
+fai_file = snakemake.params["fai"]
 map_file = snakemake.input["map_temp"]
 output_file = snakemake.output["mapp"]
-generate_mapping(input_file, map_file, output_file)
+generate_mapping(fai_file, map_file, output_file)

@@ -105,7 +105,7 @@ rule algatr_tess:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
         rmislands = "true",
-        kvals = "1:5",
+        kvals = "1:10",
         output_path = "results/{refGenome}/algatr/"
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
@@ -406,6 +406,9 @@ rule get_k_files:
     input: get_k
     output: touch("results/{refGenome}/algatr/{prefix}/k.done")
 
+
+
+
         
 rule get_chromosome_names:
     input:
@@ -431,17 +434,16 @@ rule rename_chromosomes:
     conda:
         "envs/roh.yml"
     params:
-        chrom_num = 2
+        chrom_num = 10
     shell:
         '''
         awk 'NR<={params.chrom_num} {{print $1}}' {input.fai} > {output.chrom_names} 
         '''
-        # '''
-        # bcftools annotate --rename-chrs {input.renamed} {input.snp_vcf} -Oz -o {output.renamed_snp_vcf}
-        # awk 'NR<=10 {{print $1}}' {input.fai} > {output.chrom_names}
-        # '''
-#this is good
+
 rule annotate_vcf:
+    '''
+    Generates an annotated pruned vcf to be used for GONE
+    '''
     input:
         vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
     output:
@@ -459,7 +461,6 @@ rule GONE_vcf:
         vcf_ap = "results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz"
     output:
         GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz",
-        
     conda:
         "envs/roh.yml"
     shell:
@@ -467,34 +468,62 @@ rule GONE_vcf:
         bcftools view -t $(cat {input.chrom_names} | tr '\n' ',') -Oz -o {output.GONE_vcf} {input.vcf_ap}
         '''
 
-rule plink_bed:
+rule SNP_check:
     input:
-        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
-        #vcf_ap = "results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz",
         GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz"
-
     output:
-        # mapp = "results/{refGenome}/CCGP/{prefix}_plink.map",
-        # ped = "results/{refGenome}/CCGP/{prefix}_plink.ped"
-        plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt"
+        snp_positions = "results/{refGenome}/CCGP/plink/{prefix}_snp_positions.txt",
+        GONE_csi = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz.csi"
 
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools query -f '%CHROM\t%POS\t%REF\n' {input.GONE_vcf} | awk 'length($3) == 1 {{print $1"\t"$2}}' > {output.snp_positions}
+        bcftools index {input.GONE_vcf}
+        '''
+
+rule SNP_vcf:
+    input:
+        snp_positions = "results/{refGenome}/CCGP/plink/{prefix}_snp_positions.txt",
+        GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz"
+    output:
+        indel_phobic_vcf = "results/{refGenome}/CCGP/plink/{prefix}_snp_annotated_pruned.vcf.gz",
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools view -R {input.snp_positions} {input.GONE_vcf} -Oz -o {output.indel_phobic_vcf}
+        '''
+
+rule plink_bed:
+    '''
+    Makes initial map and ped files from GONE_contigs vcf.
+    '''
+    input:
+        #GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz",
+        indel_phobic_vcf = "results/{refGenome}/CCGP/plink/{prefix}_snp_annotated_pruned.vcf.gz",
+    output:
+        plink_bed = "results/{refGenome}/CCGP/plink/{prefix}_plink.bed"
     params:
         plink_out = "results/{refGenome}/CCGP/plink/{prefix}_plink"
     conda:
         "envs/plink1_9.yml"
     shell:
         '''
-        plink --vcf {input.GONE_vcf} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
-        touch {output.plink_done}
+        plink --vcf {input.indel_phobic_vcf} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
         '''
 
         
 rule plink_map:
+    '''
+    Generates map and ped files, but renames the map file so it can be modified in rule "rename_chrom_plink". Temporary map file will be used in next rule to rename chromosomes 1-n.
+    '''
     input:
-        plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt"
+        #plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt",
+        plink_bed = "results/{refGenome}/CCGP/plink/{prefix}_plink.bed"
     output:
-        plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+        #plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
         plink_map_temp = "results/{refGenome}/CCGP/plink/{prefix}_plink_ORIG.map"
     params:
         plink_out = "results/{refGenome}/CCGP/plink/{prefix}_plink"
@@ -504,76 +533,58 @@ rule plink_map:
         '''
         plink --bfile {params.plink_out} --recode --out {params.plink_out} --allow-extra-chr
         mv {params.plink_out}.map {output.plink_map_temp}
-        touch {output.plink_map_done}
         '''
 
 
 rule rename_chrom_plink:
+    '''
+    Renames chromosomes 1-n. This is necessary for GONE to execute properly. Confirmed same number of lines in ORIG.map and .map.
+    '''
     input:
         map_temp = "results/{refGenome}/CCGP/plink/{prefix}_plink_ORIG.map",
-        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
-        plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+        #plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
     output:
-        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map"
+        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
+    params:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     script:
         "scripts/rename_map.py"
         
     
 
-# rule GONE:
-#     input:
-#         #mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
-#         #ped = "results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
-#         plink_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
-#         #GONE_vcf = "results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz"
-#     output:
-#         GONE_done = "results/{refGenome}/CCGP/GONE/{prefix}_done.txt"
-#     params:
-#         #GONE_out = "results/{refGenome}/CCGP/GONE/{prefix}_gone",
-#         script_dir = "/scratch2/erik/CCGP-reruns/GONE/Linux/script_GONE.sh",
-#         plink_out = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink",
-
-#     shell:
-#         '''
-#         bash {params.script_dir} {params.plink_out} 
-#         touch {output.GONE_done}
-#         '''
-
 rule get_GONE:
     input:
-        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map"
+        mapp = "results/{refGenome}/CCGP/plink/{prefix}_plink.map",
     output:
-        #map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
-        GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
+        map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
+        #GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux/GONE_script.sh"
+        #GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
     params:
-        GONE_dwn_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE",
+        GONE_dwn_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}",
         map_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.map",
         ped_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/CCGP/plink/{prefix}_plink.ped",
         GONE_dir = "/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux"
 
     shell:
         '''
-        git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}
+        if [ -f {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh ]; then
+            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh already exists."
+        else
+            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh does not exist. Cloning the GONE repository."
+            rm -rf {params.GONE_dwn_dir}/GONE/
+            git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
+            chmod -R +x {params.GONE_dwn_dir}/GONE
+        fi
         cp {params.map_dir} {params.GONE_dir}
         cp {params.ped_dir} {params.GONE_dir}
-        chmod -R +x {params.GONE_dwn_dir}
-        touch {output.GONE_downloaded}
         '''
 
-        # if [ -d {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh ]; then
-        #     echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh already exists."
-        # else
-        #     echo "Directory {params.GONE_dwn_dir}/Linux/GONE_script.sh does not exist. Cloning the GONE repository."
-        #     git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
-        # fi
-        # cp {params.map_dir} {params.GONE_dir}
-        # cp {params.ped_dir} {params.GONE_dir}
-        # chmod -R +x {params.GONE_dwn_dir}/GONE
-        # touch {output.GONE_downloaded}
 rule run_GONE:
     input:
-        #map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
-        GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
+        map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
+        #GONE_downloaded = "results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt"
     output:
         GONE_out_d2 = "results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink",
         GONE_out_Ne = "results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink",
@@ -587,5 +598,3 @@ rule run_GONE:
         cd {params.GONE_dir} 
         bash script_GONE.sh {params.ccgp_id}
         '''
-
-

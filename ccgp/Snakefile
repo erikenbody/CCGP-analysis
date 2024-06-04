@@ -4,7 +4,7 @@ include: "common.smk"
 
 rule roh:
     input:
-        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
     output:
         roh = "results/{refGenome}/CCGP/{prefix}.roh.gz",
         rg = "results/{refGenome}/CCGP/{prefix}.rg.roh"
@@ -22,7 +22,7 @@ rule roh:
 rule froh:
     input:
         roh = "results/{refGenome}/CCGP/{prefix}.rg.roh",
-        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai"),
     output:
         froh = "results/{refGenome}/CCGP/{prefix}_filtered.froh",
         top = "results/{refGenome}/CCGP/{prefix}_filtered_top.froh"
@@ -31,7 +31,7 @@ rule froh:
 
 rule pi:
     input:
-        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
         top = "results/{refGenome}/CCGP/{prefix}_filtered_top.froh"
     output:
         pi1 = "results/{refGenome}/CCGP/{prefix}.1.windowed.pi",
@@ -93,7 +93,7 @@ rule qc_plots:
 
 rule annotate:
     input:
-        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
     output:
         ann = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"
     conda:
@@ -105,7 +105,7 @@ rule annotate:
 
 rule plinkld:
     input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
     output:
         ld = "results/{refGenome}/CCGP/{prefix}_0.3.prune.in",
         ld2 = "results/{refGenome}/CCGP/{prefix}_0.3.prune.out",
@@ -134,7 +134,7 @@ rule plinkld:
 
 rule prunevcf:
     input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         ld3 = "results/{refGenome}/CCGP/{prefix}_0.3.prune.in",
         ld6 = "results/{refGenome}/CCGP/{prefix}_0.6.prune.in"
     output:
@@ -153,7 +153,7 @@ rule plink:
     Call plink distance mat.
     """
     input:
-        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
         pruned3 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz",
         pruned6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"     
     params:
@@ -192,7 +192,7 @@ rule complete:
 
 rule vcf2dosage:
     input:
-        vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
     output:
         dosage = "results/{refGenome}/CCGP/{prefix}_annotated_no_pruning_dosage.txt.gz",
     run:
@@ -236,7 +236,7 @@ rule mil_subsample_snps:
         bcftools view -e 'ALT="*" | F_MISSING > 0.25 | ref="N"' {input.vcf} -O z -o {output.filtered}
         bcftools index {output.filtered}
 
-        #figure out how many SNPs are left, then identify how big of SNP window size to get down to between 100 and 150k snps        
+        #figure out how many SNPs are left, then identify how big of SNP window size to get down to 1mil snps      
         ALLSITES=`bcftools query -f '%CHROM\t%POS\n' {output.filtered} | wc -l`
         SITES=`echo $(( ${{ALLSITES}} / 1000000 ))`
 
