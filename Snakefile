@@ -13,8 +13,6 @@ def get_scaffolds(fai):
                 scaffolds.append(scaffold)
     return scaffolds
 
-
-
 # rename_contigs = config["rename_chromosome"]
 # def get_chrom_names(contigs, output_contigs):
 #     if rename_contigs:
@@ -88,20 +86,22 @@ output = [
        
        
         # # GONE stuff.
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_plink_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        # expand("results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        
-        #expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_downloaded_GONE.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_download_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
+        expand("results/{refGenome}/CCGP/plink/{prefix}_annotated_pruned.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_plink.bed", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_plink_ORIG.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_snp_positions.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/plink/{prefix}_snp_annotated_pruned.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/plink/{prefix}_GONE_contigs.vcf.gz.csi", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        # expand("/scratch2/erik/CCGP-reruns/projects/{prefix}/results/{refGenome}/GONE/Linux/GONE_script.sh", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/GONE/Linux/{prefix}_plink.ped", refGenome = config['refgenome'], prefix=config['final_prefix']),
+
+        expand("results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
     
         
 ]
