@@ -3,15 +3,15 @@ import pandas as pd
 
 def generate_population_output(sample_dict, total_populations, ccgp_project_id, ref_genome, trashed_samples):
     for key, value in sample_dict.items():
-        output = f"results/{ref_genome}/algatr/{ccgp_project_id}_populations/population_{key}.txt"
+        output = f"results/{ref_genome}/pop_analysis/{ccgp_project_id}_populations/population_{key}.txt"
         os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, 'w') as file:
             for sample in value:
                 file.write(f'{sample}\n')
 
-    output_done = f"results/{ref_genome}/algatr/{ccgp_project_id}_populations-done.txt"
+    output_done = f"results/{ref_genome}/pop_analysis/{ccgp_project_id}_populations-done.txt"
     
-    # output_trash = f"results/{ref_genome}/algatr/{ccgp_project_id}_trashed_samples/trashed_samples.txt"
+    # output_trash = f"results/{ref_genome}/pop_analysis/{ccgp_project_id}_trashed_samples/trashed_samples.txt"
     # os.makedirs(os.path.dirname(output_trash), exist_ok=True)
     # with open(output_trash, 'w') as file:
     #     for sample in trashed_samples:

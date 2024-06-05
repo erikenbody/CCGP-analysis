@@ -6,3 +6,4 @@ dependencies:
   - pybedtools==0.10.0
   - pandas==2.1.4
   - bcftools==1.16
+  - shapeit5==5.1.1
