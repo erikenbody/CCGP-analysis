@@ -1,0 +1,323 @@
+def get_k(wc):
+    pops = checkpoints.distinguish_populations.get(**wc).output[1]
+
+    k_values = []
+    
+    pops_dir = Path(pops)
+    
+    if pops_dir.is_dir():
+        
+        files = [file.name for file in pops_dir.iterdir() if file.is_file()]
+        
+        k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
+    out = [*expand("results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.roh.gz", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_filtered_population_{k}.froh", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values)
+    ]
+    
+    return out
+    
+checkpoint distinguish_populations:
+    input:
+        matrix = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv"
+    output:
+        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+        outdir = directory("results/{refGenome}/pop_analysis/{prefix}_populations")
+    conda:
+        "envs/assign_pops.yml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        manual_k_assignment = "NA",
+        threshold_qval = 0.80
+    script:
+        "scripts/population_assignment.py"
+    
+rule bcf_populations:
+    input:
+        pops = "results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        pops_done = ancient("results/{refGenome}/pop_analysis/{prefix}_populations-done.txt")
+    output:
+        pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        index = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi"
+    conda:
+        "envs/roh.yml"
+    shell:
+        """
+        bcftools view -S {input.pops} -Ou -a -U {input.vcf} | bcftools +fill-tags -Ou |
+        bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.pop_vcf}
+        bcftools index {output.pop_vcf}
+        """
+
+rule pi_populations:
+    input:
+        pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        bed = "results/{refGenome}/{prefix}_callable_sites.bed"
+    output:
+        pi = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv"
+    conda:
+        "envs/pi.yaml"
+    params:
+        project_id = "{prefix}",
+        ref_genome = "{refGenome}",
+        k_value = "{k}"
+    script:
+        "scripts/calculate_pi.py"
+
+
+rule roh_pop:
+    input:
+        pop_vcf = ancient("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz"),
+    output:
+        roh = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.roh.gz",
+        rg = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh"
+    conda:
+        "envs/roh.yml"
+    resources:
+       mem_mb = 128000,
+       threads = 10
+    shell:
+        """
+        bcftools roh --threads 10 -G30 -Oz -o {output.roh} {input.pop_vcf}
+        zgrep RG {output.roh} > {output.rg}
+        """
+
+rule merge_roh:
+    input:
+        rg = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh"
+    output:
+        merged_rg = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
+    conda:
+        "envs/roh.yml"
+    params:
+        gap_size = 10000
+    script:
+        "scripts/merge_roh.py"
+
+
+rule froh_2:
+    input:
+        rg = ancient("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh"),
+        fai = ancient("results/{refGenome}/data/genome/{refGenome}.fna.fai"),
+    output:
+        froh = "results/{refGenome}/pop_analysis/{prefix}_filtered_population_{k}.froh",
+        top = "results/{refGenome}/pop_analysis/{prefix}_filtered_population_{k}_top.froh"
+    conda:
+        "envs/froh.yml"
+    params:
+        population = "{k}",
+        interval_width = 25
+    script:
+        "scripts/froh.py"
+
+rule get_k_files:
+    # dummy rule to get all of the files split by k pops
+    input: get_k
+    output: touch("results/{refGenome}/pop_analysis/{prefix}/k.done")
+
+
+
+#### COME BACK AND LOOK AT THIS RULE. NOT BEING USED WHEN CONFIG "RENAME_CONTIGS" == TRUE.
+rule get_chromosome_names:
+    input:
+        contigs = "results/{refGenome}/algatr/{prefix}_contigs.tsv"
+    output:
+        renamed = "results/{refGenome}/pop_analysis/{prefix}_chromosome_names.txt"
+    conda:
+        "envs/assign_pops.yml"
+    params:
+        project_id = "{prefix}"
+    script:
+        "scripts/get_chromosome_names.py"
+
+# rule update_chromosome_names:
+#     input:
+#         renamed = "results/{refGenome}/pop_analysis/{prefix}_chromosome_names.txt",
+#         snp_vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+#     output:
+#         renamed_snp_vcf = "results/{refGenome}/algatr/{prefix}_renamed_clean_snps.vcf.gz",
+#     conda:
+#         "envs/roh.yml"
+#     shell:
+#         '''
+#         bcftools annotate --rename-chrs {input.renamed} -Oz -o {output.renamed_snp_vcf} {input.snp_vcf}
+#         '''
+##########
+
+# This is good.
+rule rename_chromosomes:
+    input:
+        #renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt",
+        #snp_vcf = "results/{refGenome}/{prefix}_clean_snps.vcf.gz",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
+    output:
+        #renamed_snp_vcf = "results/{refGenome}/algatr/{prefix}_renamed_clean_snps.vcf.gz",
+        chrom_names = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.txt"
+    conda:
+        "envs/roh.yml"
+    params:
+        chrom_num = 10
+    shell:
+        '''
+        awk 'NR<={params.chrom_num} {{print $1}}' {input.fai} > {output.chrom_names} 
+        '''
+
+rule annotate_vcf:
+    '''
+    Generates an annotated pruned vcf to be used for GONE
+    '''
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+    output:
+        vcf_ap = "results/{refGenome}/pop_analysis/plink/{prefix}_annotated_pruned.vcf.gz"
+    conda:
+        "envs/roh.yml"
+    shell:
+        """
+        bcftools annotate --set-id '%CHROM\_%POS\_%REF\_%FIRST_ALT' -Oz -o {output.vcf_ap} {input.vcf}
+        """
+
+rule GONE_vcf:
+    input:
+        chrom_names = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.txt",
+        vcf_ap = "results/{refGenome}/pop_analysis/plink/{prefix}_annotated_pruned.vcf.gz"
+    output:
+        GONE_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.vcf.gz",
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools view -t $(cat {input.chrom_names} | tr '\n' ',') -Oz -o {output.GONE_vcf} {input.vcf_ap}
+        '''
+
+rule SNP_check:
+    input:
+        GONE_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.vcf.gz"
+    output:
+        snp_positions = "results/{refGenome}/pop_analysis/plink/{prefix}_snp_positions.txt",
+        GONE_csi = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.vcf.gz.csi"
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools query -f '%CHROM\t%POS\t%REF\n' {input.GONE_vcf} | awk 'length($3) == 1 {{print $1"\t"$2}}' > {output.snp_positions}
+        bcftools index {input.GONE_vcf}
+        '''
+
+rule SNP_vcf:
+    input:
+        snp_positions = "results/{refGenome}/pop_analysis/plink/{prefix}_snp_positions.txt",
+        GONE_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.vcf.gz"
+    output:
+        indel_absent_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_snp_annotated_pruned.vcf.gz",
+    conda:
+        "envs/roh.yml"
+    shell:
+        '''
+        bcftools view -R {input.snp_positions} {input.GONE_vcf} -Oz -o {output.indel_absent_vcf}
+        '''
+
+rule plink_bed:
+    '''
+    Makes initial map and ped files from GONE_contigs vcf.
+    '''
+    input:
+        #GONE_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_GONE_contigs.vcf.gz",
+        indel_absent_vcf = "results/{refGenome}/pop_analysis/plink/{prefix}_snp_annotated_pruned.vcf.gz",
+    output:
+        plink_bed = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.bed"
+    params:
+        plink_out = "results/{refGenome}/pop_analysis/plink/{prefix}_plink"
+    conda:
+        "envs/plink1_9.yml"
+    shell:
+        '''
+        plink --vcf {input.indel_absent_vcf} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
+        '''
+
+        
+rule plink_map:
+    '''
+    Generates map and ped files, but renames the map file so it can be modified in rule "rename_chrom_plink". Temporary map file will be used in next rule to rename chromosomes 1-n.
+    '''
+    input:
+        #plink_done = "results/{refGenome}/pop_analysis/plink/{prefix}_plink_done.txt",
+        plink_bed = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.bed"
+    output:
+        #plink_map_done = "results/{refGenome}/pop_analysis/plink/{prefix}_plink_map_done.txt",
+        plink_map_temp = "results/{refGenome}/pop_analysis/plink/{prefix}_plink_ORIG.map"
+    params:
+        plink_out = "results/{refGenome}/pop_analysis/plink/{prefix}_plink"
+    conda:
+        "envs/plink1_9.yml"
+    shell:
+        '''
+        plink --bfile {params.plink_out} --recode --out {params.plink_out} --allow-extra-chr
+        mv {params.plink_out}.map {output.plink_map_temp}
+        '''
+
+
+rule rename_chrom_plink:
+    '''
+    Renames chromosomes 1-n. This is necessary for GONE to execute properly. Confirmed same number of lines in ORIG.map and .map.
+    '''
+    input:
+        map_temp = "results/{refGenome}/pop_analysis/plink/{prefix}_plink_ORIG.map",
+        #plink_map_done = "results/{refGenome}/CCGP/plink/{prefix}_plink_map_done.txt",
+    output:
+        mapp = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.map",
+    params:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
+    script:
+        "scripts/rename_map.py"
+    
+rule get_GONE:
+    input:
+        mapp = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.map",
+    output:
+        map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
+    params:
+        GONE_dwn_dir = "results/{refGenome}",
+        map_dir = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.map",
+        ped_dir = "results/{refGenome}/pop_analysis/plink/{prefix}_plink.ped",
+        GONE_dir = "results/{refGenome}/GONE/Linux"
+
+    shell:
+        '''
+        if [ -f {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh ]; then
+            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh already exists."
+        else
+            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh does not exist. Cloning the GONE repository."
+            rm -rf {params.GONE_dwn_dir}/GONE/
+            git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
+            chmod -R +x {params.GONE_dwn_dir}/GONE
+        fi
+        pwd
+        cp {params.map_dir} {params.GONE_dir}
+        cp {params.ped_dir} {params.GONE_dir}
+        '''
+
+rule run_GONE:
+    input:
+        map_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.map",
+        ped_GONE = "results/{refGenome}/GONE/Linux/{prefix}_plink.ped",
+    output:
+        GONE_out_d2 = "results/{refGenome}/GONE/Linux/Output_d2_{prefix}_plink",
+        GONE_out_Ne = "results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink",
+        GONE_output = "results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink",
+    params:
+        GONE_dir = "results/{refGenome}/GONE/Linux",
+        ccgp_id = '{prefix}_plink'
+    shell:
+        '''
+        cd {params.GONE_dir} 
+        bash script_GONE.sh {params.ccgp_id}
+        '''

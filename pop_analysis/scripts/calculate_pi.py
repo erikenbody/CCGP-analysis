@@ -33,7 +33,7 @@ def main(vcf_path, bed_path, k_value, ccgp_project_id, ref_genome):
 
     pi = sum_pairwise_diff / total_length
 
-    output_path = f"results/{ref_genome}/algatr/{ccgp_project_id}_population_pi/pi_population_{k_value}.csv"
+    output_path = f"results/{ref_genome}/pop_analysis/{ccgp_project_id}_population_pi/pi_population_{k_value}.csv"
     with open(output_path, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow([ccgp_project_id, k_value, pi])
