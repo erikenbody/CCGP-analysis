@@ -10,21 +10,23 @@
 #' @param pruned whether to retrieve LD-pruned data (TRUE; default) or not (FALSE)
 #' @param impute if `analysis = "vcf"`, whether to impute missing values based on simple median-based imputation ("simple"), structure-based using sNMF ("structure") or no imputation ("none"; default)
 #' @param kvals if `analysis = "vcf"` and `impute = "structure"`, integer vector corresponding to the number of ancestral populations for which the sNMF algorithm estimates have to be calculated
+#' @param save_impute if `impute`, export imputed genotypes (defaults to FALSE)
+#' @param incl_env whether to retrieve envlayers (defaults to TRUE)
 #' @param rmislands whether to remove islands (TRUE; default) or not (FALSE) depending on project's sampling
+#' @param intervals boolean whether the analysis is running per contig or for the genome
+#' @param scaff if intervals, which scaffold is being run
 #'
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
 #' NOTE: requires a common dir containing env files. Within that dir, must contain "PC_layers" and "CA_State" dirs
-get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA) {
+get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE) {
   
   # Get coords --------------------------------------------------------------
 
-  #coords <- readr::read_tsv(paste0(data_path, "QC/", species, ".coords.txt", sep = ""), col_names = FALSE)
   coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
   colnames(coords) <- c("INDV", "x", "y")
   coords$x <- as.numeric(coords$x)
   coords$y <- as.numeric(coords$y)
-  #coords <- coords %>% filter(!is.na(x)) #remove coordinates with missing data. this breaks other things
 
   print(coords)
   # Get input data ----------------------------------------------------------
@@ -75,8 +77,13 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   dat <- check_ccgp_data(gen = gen, coords = coords, filetype = analysis)
   
   # Get envlayers -----------------------------------------------------------
-  env <- get_envlayers(env_path = paste0(snakemake@scriptdir, "/../../data/"), rmislands = rmislands)
-  print(paste0(snakemake@scriptdir, "/../../data/"))
+  # Get envlayers -----------------------------------------------------------
+  if (incl_env) {
+    env <- get_envlayers(env_path = paste0(snakemake@scriptdir, "/../../data/"), rmislands = rmislands)
+  } else {
+    env <- NULL
+  }
+  
   return(list(gen = gen, coords = dat$coords, sampleIDs = dat$sampleIDs, envlayers = env))
 }
 
@@ -156,9 +163,26 @@ get_envlayers <- function(env_path, rmislands = FALSE){
 #'
 #' @return converted coords in sp format
 #' @export
-# coords_to_df <- function(coords) {
-#   if (inherits(coords, "sf")) coords <- sf::st_coordinates(coords)
-#   if (is.matrix(coords)) coords <- data.frame(coords)
-#   colnames(coords) <- c("x", "y")
-#   return(coords)
-# }
+coords_to_df <- function(coords) {
+  if (inherits(coords, "sf")) coords <- sf::st_coordinates(coords)
+  if (is.matrix(coords)) coords <- data.frame(coords)
+  colnames(coords) <- c("x", "y")
+  return(coords)
+}
+
+#' Reproject sampling coordinates and raster to same CRS
+#'
+#' @param coords sampling coordinates, in latitude/longitude degrees
+#' @param env RasterStack of envlayers to be reprojected
+#'
+#' @return reprojected coords
+#' @export
+reproject <- function(coords, env) {
+  latlong <- sf::st_as_sf(coords, coords = c("x", "y"), crs = "+proj=longlat")
+  coords_proj <- sf::st_transform(latlong, crs = 3310)
+  
+  if (!is.null(env)) env_proj <- raster::projectRaster(env, crs = 3310)
+  if (is.null(env)) env_proj <- NULL
+  
+  return(list(coords_proj = coords_proj, env_proj = env_proj))
+}
