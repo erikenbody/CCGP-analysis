@@ -20,8 +20,12 @@ New modules here include:
 2) clone this repo
 3) run the following to test out a small subset of data (within the repo directory):
 ```
-snakemake --dir test_data/ --use-conda -c 10 --config config_file="config.yaml"
+snakemake --dir test_data/ --use-conda -c 10 --profile profiles/silverbullet_reruns/
 ```
+
+# Notes on implementation
+
+The way this directory 
 
 
 If you want to run on a different project, you must match the file naming and structure of the test_data directory. This contains a handful of outputs from the snparcher workflow:
