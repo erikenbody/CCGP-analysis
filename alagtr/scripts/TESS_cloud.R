@@ -11,6 +11,9 @@ suppressMessages({
   library(dplyr)
   library(rgdal)
   library(peakRAM)
+  library(algatr)
+  library(wingen)
+  library(tess3r)
 })
 
 #set up log file writing
@@ -26,39 +29,17 @@ log_smk()
 
 # example call: `Rscript TESS_rancor.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" TRUE 1:5 "outputs/TESS/"`
 
-if (!require("algatr", character.only = TRUE)) {
-  # Install the package if not installed
-  devtools::install_github("TheWangLab/algatr", quiet = T)
-}
-
-if (!require("wingen", character.only = TRUE)) {
-  # Install the package if not installed
-  devtools::install_github("AnushaPB/wingen", quiet = T)
-}
-
-if (!require("tess3r", character.only = TRUE)) {
-  # Install the package if not installed
-  devtools::install_github("bcm-uga/TESS3_encho_sen", quiet = T)
-}
 #!/usr/bin/env Rscript # leave line commented
 
 species = snakemake@params[[1]]
 data_path = snakemake@params[[2]]
-rmislands = snakemake@params[[3]]
+rmislands = as.logical(snakemake@params[[3]])
 kvals = snakemake@params[[4]]
 output_path = snakemake@params[[5]]
+incl_env = as.logical(snakemake@params[[6]])
 
 #need to interpret the kvals string as an expression
 kvals <- try(eval(parse(text = kvals)), silent = TRUE)
-#kvals <- 1:3
-#similar problem with logical true/false
-if (rmislands == "true") {
-  rmislands <- TRUE
-} else if (rmislands == "false") {
-  rmislands <- FALSE
-} else {
-  stop("Invalid logical value provided as an argument. Please use 'True' or 'False'.")
-}
 
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
@@ -71,8 +52,10 @@ peakRAM_imp <-
                              analysis = "vcf",
                              pruned = TRUE,
                              impute = "none",
-                             rmislands = rmislands)
+                             rmislands = rmislands,
+                             incl_env = incl_env)
   )
+
 
 # Convert to dosage matrix ------------------------------------------------
 
@@ -85,30 +68,15 @@ peakRAM_dos <-
 # Run K selection test and TESS -------------------------------------------
 
 run_tess <- function(dat) {
-  # TODO: below will be fixed in newer versions of algatr
-  if (length(kvals) == 1) {
-    tess3_obj <- tess3r::tess3(X = gen, 
-                               coord = as.matrix(dat$coords), 
-                               K = kvals, 
-                               method = "projected.ls", 
-                               lambda = 1, 
-                               ploidy = 2)
-    # Extract TESS object and best K
-    bestK <- tess3_obj$K
-  }
-  
-  if (length(kvals) > 1) {
-    tess3_result <- algatr::tess_ktest(gen, 
-                                       dat$coords, 
-                                       grid = raster::aggregate(dat$envlayers[[1]], fact = 6),
-                                       Kvals = kvals, 
-                                       ploidy = 2, 
-                                       K_selection = "auto")
-    # Extract TESS object and best K
-    tess3_obj <- tess3_result$tess3_obj
-    bestK <- tess3_result[["K"]]
-  }
-  
+  tess3_result <- algatr::tess_ktest(gen, 
+                                     dat$coords,
+                                     Kvals = kvals, 
+                                     ploidy = 2, 
+                                     K_selection = "auto")
+  # Extract TESS object and best K
+  tess3_obj <- tess3_result$tess3_obj
+  bestK <- tess3_result[["K"]]
+
   # Get Q matrix
   qmat <- tess3r::qmatrix(tess3_obj, K = bestK)
   
@@ -123,10 +91,17 @@ peakRAM_tess <-
 
 # Krige Q values ----------------------------------------------------------
 
-# peakRAM_krig <-
-#   peakRAM::peakRAM(
-#     krig_admix <- algatr::tess_krig(results$qmat, dat$coords, results$krig_raster)
-#   )
+if (!is.null(incl_env)) {
+  grid <- raster::aggregate(dat$envlayers[[1]], fact = 6)
+  reproj <- reproject(coords = dat$coords, env = grid)
+  
+  peakRAM_krig <-
+    peakRAM::peakRAM(
+      krig_admix <- algatr::tess_krig(results$qmat, 
+                                      reproj$coords_proj, 
+                                      reproj$env_proj)
+    )
+}
 
 
 # Export results ----------------------------------------------------------
@@ -144,9 +119,8 @@ export_TESS <- function(dat, results) {
         return(pops)
       }) %>% 
       dplyr::bind_rows()
-
-    qvals$best_k = unique(results$bestK)
     
+    qvals$best_k = unique(results$bestK)
     readr::write_csv(qvals,
                      file = paste0(output_path, species, "_TESS_qmatrix.csv"),
                      col_names = TRUE)
@@ -160,16 +134,17 @@ export_TESS <- function(dat, results) {
   }
   
   # Export raster of kriged Q values
-  # terra::writeRaster(krig_admix,
-  #                    paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
-  #                    overwrite = TRUE)
+  if (!is.null(incl_env)) {
+    terra::writeRaster(krig_admix,
+                       paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
+                       overwrite = TRUE)
+  }
   
   # Export cross-entropy values for all K values
   x <- results$tess3_obj
   
   xent <- seq_along(x)
   rmse <- seq_along(x)
-  print(rmse)
   K <- seq_along(x)
   
   if (length(x) > 1) {
@@ -200,13 +175,22 @@ peakRAM_exp <-
 
 # Export RAM usage --------------------------------------------------------
 
-RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
-                        as.data.frame(peakRAM_dos),
-                        as.data.frame(peakRAM_tess),
-                        #as.data.frame(peakRAM_krig),
-                        as.data.frame(peakRAM_exp)) %>% 
-  #dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
-  dplyr::mutate(fxn = c("import", "dosage", "run", "export"))
+if (!is.null(incl_env)) {
+  RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
+                          as.data.frame(peakRAM_dos),
+                          as.data.frame(peakRAM_tess),
+                          as.data.frame(peakRAM_krig),
+                          as.data.frame(peakRAM_exp)) %>% 
+    dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
+}
+
+if (is.null(incl_env)) {
+  RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
+                          as.data.frame(peakRAM_dos),
+                          as.data.frame(peakRAM_tess),
+                          as.data.frame(peakRAM_exp)) %>% 
+    dplyr::mutate(fxn = c("import", "dosage", "run", "export"))
+}
 
 readr::write_csv(RAM,
                  file = paste0(output_path, species, "_TESS_peakRAM.csv"))
