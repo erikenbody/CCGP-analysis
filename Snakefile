@@ -52,6 +52,7 @@ output = [
         # Algatr
         expand("results/{refGenome}/algatr/{prefix}.coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/algatr/{prefix}_TESS_pieplot.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
 
         # phasing output, in progress:
         #expand("results/{refGenome}/algatr/{prefix}_shapeit5_phased.bcf", refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -59,7 +60,7 @@ output = [
         #expand("results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf", refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
         
         # RDA output:
-        expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+        #expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
         
         # RDA LD pruned output:
          
@@ -71,8 +72,7 @@ output = [
         # expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
-        #expand("results/{refGenome}/pop_analysis/{prefix}/k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/{prefix}_GONE_downlaoded.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/pop_analysis/{prefix}/k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
     
         
 ]
