@@ -36,3 +36,9 @@ If you want to run on a different project, you must match the file naming and st
 4) the fai index
 
 A config file is required `config.yaml` which defines the parameters for the run. This is similar to the snpArcher config, but has a few custom additions. 
+
+# Notes on filters
+
+* clean SNPs has MAF filter set of < 0.01
+* setting MAF filter to < 0.05 for the mil sub sampled SNP file. But this hasnt been re run yet
+* All VCFs should be filtered for F_MISSING < 0.25 (must be 75% of individuals with data)
