@@ -3,25 +3,25 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - r-base
-  - r-tidyverse
-  - r-raster
-  - r-vegan
-  - bioconductor-qvalue
-  - r-peakRAM
-  - r-here
-  - r-devtools
-  - r-sf
-  - r-units
-  - r-adegenet
-  - bioconductor-lea
-  - r-rgdal
-  - r-ggrepel
-  - r-robust
-  - r-car
-  - r-terra
-  - r-fields
-  - r-rworldmap
-  - r-automap
-  - r-cowplot
-  - r-rmapshaper
+  - r-base==4.3.3
+  - r-tidyverse==2.0.0
+  - r-raster==3.6_26
+  - r-vegan==2.6_6.1
+  - bioconductor-qvalue==2.34.0
+  - r-peakram==1.0.2
+  - r-here==1.0.1
+  - r-devtools==2.4.5
+  - r-sf==1.0_16
+  - r-units==0.8_5
+  - r-adegenet==2.1.10
+  - bioconductor-lea==3.14.0
+  - r-rgdal==1.6_7
+  - r-ggrepel==0.9.5
+  - r-robust==0.7_4
+  - r-car==3.1_2
+  - r-terra==1.7_78
+  - r-fields==15.2
+  - r-rworldmap==1.3_8
+  - r-automap==1.1_9
+  - r-cowplot==1.1.3
+  - r-rmapshaper==0.5.0

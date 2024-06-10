@@ -231,9 +231,10 @@ rule mil_subsample_snps:
         "envs/roh.yml"
     shell:
         """
-        ##first remove filtered sites and retain only biallelic SNPs
-        ##make sure high missingness isnt present, could have snuck through in old versions of datasets
-        bcftools view -e 'ALT="*" | F_MISSING > 0.25 | ref="N"' {input.vcf} -O z -o {output.filtered}
+        ## first remove filtered sites and retain only biallelic SNPs
+        ## make sure high missingness isnt present, could have snuck through in old versions of datasets
+        ## for this dataset, setting a stronger filter of MAF > 0.05
+        bcftools view -e 'ALT="*" | F_MISSING > 0.25 | ref="N" | AF< 0.05 | AF > 0.95' {input.vcf} -O z -o {output.filtered}
         bcftools index {output.filtered}
 
         #figure out how many SNPs are left, then identify how big of SNP window size to get down to 1mil snps      

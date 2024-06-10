@@ -140,6 +140,19 @@ rule algatr_tess:
     script:
         "scripts/TESS_cloud.R" 
 
+rule algatr_pieplot:
+    input:
+        tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt" 
+    params:
+        species = config['final_prefix'],
+    output:
+        plot = "results/{refGenome}/algatr/{prefix}_TESS_pieplot.pdf"
+    conda:
+        "envs/pie.yml"
+    script:
+        "scripts/pie_plot.R" 
+
 rule algatr_generate_index:
     input:
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
@@ -296,4 +309,96 @@ rule concat_shapeit:
     shell:
         "bcftools concat -O z -o {output.haplo} {input.haplo}"
 
+rule vcf_to_bed:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz"
+    params:
+        prefix = "results/{refGenome}/algatr/admixture/{prefix}"
+    output:
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        plink --vcf {input.vcf} --make-bed --out {params.prefix} --allow-extra-chr --autosome-num 95 --const-fid 
+        """
 
+rule setup_admixture:
+    """
+    admixture requires all chromosome names to be integers, this sets them to be 1:n
+    """
+    input:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+    output:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim_fixed",
+        bim_back = "results/{refGenome}/algatr/admixture/{prefix}.bim.orig",
+    script:
+        "scripts/contigs4admixture.py"
+
+
+rule admixture:
+    """
+    Call Admixture. First, make a bim file that has no charecters in the chromosomes
+    """
+    input:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        bim_fixed = "results/{refGenome}/algatr/admixture/{prefix}.bim_fixed",
+        bim_back =  "results/{refGenome}/algatr/admixture/{prefix}.bim.orig",
+    output:
+        "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        mv {input.bim_fixed} {input.bim} 2> {output}
+        """
+
+rule run_admixture:
+    input:
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    output:
+        Q = "results/{refGenome}/algatr/admixture/{prefix}.{K}.Q",
+        P = "results/{refGenome}/algatr/admixture/{prefix}.{K}.P"
+    params:
+        K = "{K}"
+    log:
+        "results/{refGenome}/algatr/admixture/{prefix}_admix_K{K}.log"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        admixture --cv=10 {input.bed} {params.K} > {log}
+        mv {wildcards.prefix}.{wildcards.K}.P {output.P}
+        mv {wildcards.prefix}.{wildcards.K}.Q {output.Q}
+        """
+
+rule find_best_k:
+    input:
+        expand("results/{refGenome}/algatr/admixture/{prefix}.{K}.Q", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/algatr/admixture/{prefix}_admix_K{K}.log", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix'])
+    output:
+        "results/{refGenome}/algatr/admixture/{prefix}_best_K.txt"
+    run:
+        import re
+        cv_errors = {}
+        for K in range(1, 11):
+            log_file = f"results/{wildcards.refGenome}/algatr/admixture/{wildcards.prefix}_admix_K{K}.log"
+            with open(log_file) as f:
+                for line in f:
+                    if "CV error (K=" in line:
+                        match = re.search(r"CV error \(K=(\d+)\): (.+)", line)
+                        if match:
+                            k_val = int(match.group(1))
+                            cv_error = float(match.group(2))
+                            cv_errors[k_val] = cv_error
+
+        best_k = min(cv_errors, key=cv_errors.get)
+        with open(output[0], "w") as f:
+            f.write(f"Best K: {best_k}\n")
+            f.write("K values and corresponding CV errors:\n")
+            for k, err in cv_errors.items():
+                f.write(f"K={k}: CV error={err}\n")
