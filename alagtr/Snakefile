@@ -48,7 +48,7 @@ rule algatr_remove_samps_no_coords:
         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi"
     conda:
-        "envs/shapeit.yml"
+        "envs/bcftools.yml"
     shell:
         """
         if [ ! -s {input.excluded_samps} ]; then
@@ -70,7 +70,7 @@ rule algatr_remove_samps_no_coords_full:
         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
     conda:
-        "envs/shapeit.yml"
+        "envs/bcftool.yml"
     shell:
         """
         if [ ! -s {input.excluded_samps} ]; then
@@ -278,36 +278,36 @@ rule algatr_RDA_pruned:
     script:
         "scripts/RDA_cloud.R"
 
-rule shapeit:
-    input:
-        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
-        #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
-        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
-        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
-    output:
-        haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf"
-    conda:
-        "envs/shapeit.yml"
-    log:
-        stderr = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.err",
-        stdout = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.out"
-    shell:
-        #"shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
-        """
-        bcftools index -f {input.scaf}
-        SHAPEIT5_phase_common --input {input.scaf} --region {wildcards.scaff} --output {output.haplo} --thread 8 > {log.stdout} 2> {log.stderr}
-        """
+# rule shapeit:
+#     input:
+#         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+#         #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+#         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+#         csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+#     output:
+#         haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf"
+#     conda:
+#         "envs/shapeit.yml"
+#     log:
+#         stderr = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.err",
+#         stdout = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.out"
+#     shell:
+#         #"shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
+#         """
+#         bcftools index -f {input.scaf}
+#         SHAPEIT5_phase_common --input {input.scaf} --region {wildcards.scaff} --output {output.haplo} --thread 8 > {log.stdout} 2> {log.stderr}
+#         """
 
-rule concat_shapeit:
-    input:
-        haplo = expand("results/{{refGenome}}/algatr/haplotypes/{{prefix}}_{scaff}_phased.bcf", scaff=get_scaffolds(fai))
-    output:
-        haplo = "results/{refGenome}/algatr/{prefix}_shapeit5_phased.bcf"
-    conda:
-        "envs/shapeit.yml"
-    shell:
-        "bcftools concat -O z -o {output.haplo} {input.haplo}"
+# rule concat_shapeit:
+#     input:
+#         haplo = expand("results/{{refGenome}}/algatr/haplotypes/{{prefix}}_{scaff}_phased.bcf", scaff=get_scaffolds(fai))
+#     output:
+#         haplo = "results/{refGenome}/algatr/{prefix}_shapeit5_phased.bcf"
+#     conda:
+#         "envs/shapeit.yml"
+#     shell:
+#         "bcftools concat -O z -o {output.haplo} {input.haplo}"
 
 rule vcf_to_bed:
     input:

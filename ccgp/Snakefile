@@ -121,11 +121,9 @@ rule plinkld:
         "envs/plink.yml"
     shell:
         """
-        plink2 --vcf {input.vcf} --make-bed --indep-pairwise 50 5 0.6 --out {params.prefix1} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
-        plink2 --vcf {input.vcf} --make-bed --indep-pairwise 50 5 0.3 --out {params.prefix2} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs 
+        plink2 --vcf {input.vcf} --make-bed --indep-pairwise 50 5 0.3 --out {params.prefix1} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs 
+        plink2 --vcf {input.vcf} --make-bed --indep-pairwise 50 5 0.6 --out {params.prefix2} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
         """
-
-
 #outname = lambda wc, input: input.vcf.replace("_annotated.vcf.gz", "_pruned")
 #plink2 --extract {output.ld} --bfile {params.prefix} --make-bed --out {params.outname} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
 
@@ -189,33 +187,6 @@ rule complete:
         distid6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.dist.id"
     output:
         touch("results/{refGenome}/CCGP/{prefix}_dist_done.txt")
-
-rule vcf2dosage:
-    input:
-        vcf = ancient("results/{refGenome}/{prefix}_clean_snps.vcf.gz"),
-    output:
-        dosage = "results/{refGenome}/CCGP/{prefix}_annotated_no_pruning_dosage.txt.gz",
-    run:
-        vcf2dosage(input.vcf, output.dosage)
-
-rule vcf2dosage03:
-    input:
-        pruned3 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3.vcf.gz",
-    output:
-        dosage = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.3_dosage.txt.gz",
-    run:
-        vcf2dosage(input.pruned3, output.dosage)
-
-rule vcf2dosage06:
-    input:
-        pruned6 = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
-    output:
-        dosage = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6_dosage.txt.gz",
-    run:
-        initial_memory = get_memory_usage()
-        vcf2dosage(input.pruned6, output.dosage)
-        final_memory = get_memory_usage()
-        print(f"Memory used by vcf2dosage function: {final_memory - initial_memory} bytes")
 
 #apply another missingness filter just in case
 
