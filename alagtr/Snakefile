@@ -70,7 +70,7 @@ rule algatr_remove_samps_no_coords_full:
         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
     conda:
-        "envs/bcftool.yml"
+        "envs/bcftools.yml"
     shell:
         """
         if [ ! -s {input.excluded_samps} ]; then
