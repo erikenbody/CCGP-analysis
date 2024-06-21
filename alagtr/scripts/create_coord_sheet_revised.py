@@ -115,9 +115,10 @@ if __name__ == "__main__":
     ccgp_project_id = snakemake.params["project_id"]
     ref_genome = snakemake.params["ref_genome"]
     sample_type = snakemake.params["sample_id"]
+    samps = snakemake.input["samps"]
 
     vcf_samples = []
-    coord_samples_file = f"/scratch2/erik/CCGP-reruns/projects/{ccgp_project_id}/results/{ref_genome}/algatr/{ccgp_project_id}.samps4coords.txt"
+    coord_samples_file = samps
     with open(coord_samples_file) as file:
         for sample in file:
             vcf_samples.append(sample.strip())
