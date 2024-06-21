@@ -1,7 +1,7 @@
 import sys
-sys.path.append(
-    ".."
-)
+# sys.path.append(
+#     ".."
+# )
 import pandas as pd
 import os
 from db import get_mongo_client
@@ -15,7 +15,7 @@ db = client["ccgp_dev"]
 collection = db["sample_metadata"]
 wd_scripts = os.getcwd()
 #print(wd_scripts)
-os.chdir("..")
+#os.chdir("..")
 wd_parent = os.getcwd() #this should be ccgp-reruns/
 
 def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
