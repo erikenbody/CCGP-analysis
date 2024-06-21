@@ -1,0 +1,4 @@
+use-conda: True
+keep-going: True
+rerun-incomplete: True
+config: config_file="config.yaml"
