@@ -158,7 +158,8 @@ rule algatr_pieplot:
 rule algatr_generate_index:
     input:
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
-        
+     conda:
+        "envs/bcftools.yml"
     output:
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
     shell:
