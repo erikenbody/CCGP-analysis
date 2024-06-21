@@ -17,6 +17,8 @@ rule algatr_env:
 rule algatr_get_vcf_samples:
     input:
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+    conda:
+        "envs/bcftools.yml"
     output:
         samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
     shell:
