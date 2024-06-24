@@ -11,11 +11,8 @@ suppressMessages({
   library(dplyr)
   library(rgdal)
   library(peakRAM)
-  library(algatr)
-  library(wingen)
-  library(tess3r)
+  library(devtools)
 })
-
 
 if (!require("algatr", character.only = TRUE)) {
   # Install the package if not installed
@@ -31,6 +28,10 @@ if (!require("tess3r", character.only = TRUE)) {
   # Install the package if not installed
   devtools::install_github("bcm-uga/TESS3_encho_sen", quiet = T)
 }
+
+library(algatr)
+library(wingen)
+library(tess3r)
 
 #set up log file writing
 log_smk <- function() {
