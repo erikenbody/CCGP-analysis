@@ -11,6 +11,8 @@ rule algatr_env:
         "results/{refGenome}/algatr/{prefix}_env_created.txt"
     conda:
         "envs/algatr.yml"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_env_creation.txt"
     script:
         "scripts/setup_algatr_env.R"
 
