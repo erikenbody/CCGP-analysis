@@ -136,7 +136,7 @@ rule algatr_tess:
     output: 
     # Exported files are as follows:
         tess1 = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
-        #tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
+        tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
         tess4 = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
         tess5 = "results/{refGenome}/algatr/{prefix}_TESS_peakRAM.csv"
     conda:
