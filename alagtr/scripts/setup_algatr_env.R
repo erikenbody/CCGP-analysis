@@ -22,7 +22,7 @@ if (!require("algatr", character.only = TRUE)) {
 
 if (!require("wingen", character.only = TRUE)) {
   # Install the package if not installed
-  install.packages("wingen")
+  install.packages("wingen", repos = 'http://cran.us.r-project.org')
 }
 
 if (!require("tess3r", character.only = TRUE)) {
