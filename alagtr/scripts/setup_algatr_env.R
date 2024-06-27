@@ -22,7 +22,7 @@ if (!require("algatr", character.only = TRUE)) {
 
 if (!require("wingen", character.only = TRUE)) {
   # Install the package if not installed
-  devtools::install_github("AnushaPB/wingen", quiet = T)
+  install.packages("wingen")
 }
 
 if (!require("tess3r", character.only = TRUE)) {
