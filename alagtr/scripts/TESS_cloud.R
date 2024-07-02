@@ -33,6 +33,8 @@ library(algatr)
 library(wingen)
 library(tess3r)
 
+print("Hello world")
+
 #set up log file writing
 log_smk <- function() {
   if (exists("snakemake") & length(snakemake@log) != 0) {
