@@ -99,7 +99,19 @@ run_tess <- function(dat) {
   # Get Q matrix
   qmat <- tess3r::qmatrix(tess3_obj, K = bestK)
   
-  return(list(tess3_obj = tess3_obj, bestK = bestK, qmat = qmat, krig_raster = tess3_result$grid))
+  # Get minK value
+  ce <- list()
+  for (k in kvals) ce[[k]] <- tess3_obj[[k]]$crossentropy
+  ce.K <- c()
+  for (k in kvals) ce.K[k] <- min(ce[[k]])
+  
+  ce_results <- as.data.frame(ce.K) %>% 
+    dplyr::mutate(Kval = kvals) %>% 
+    dplyr::filter(ce.K == min(ce.K))
+  
+  minK <- ce_results$Kval
+
+  return(list(tess3_obj = tess3_obj, bestK = bestK, minK = minK, qmat = qmat, krig_raster = tess3_result$grid))
 }
 
 peakRAM_tess <-
@@ -140,6 +152,8 @@ export_TESS <- function(dat, results) {
       dplyr::bind_rows()
     
     qvals$best_k = unique(results$bestK)
+    qvals$min_k = unique(results$minK)
+    
     readr::write_csv(qvals,
                      file = paste0(output_path, species, "_TESS_qmatrix.csv"),
                      col_names = TRUE)
