@@ -74,7 +74,7 @@ output = [
         
         #expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # admixture
-        #expand("results/{refGenome}/algatr/admixture/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/algatr/admixture/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
 
     
         
