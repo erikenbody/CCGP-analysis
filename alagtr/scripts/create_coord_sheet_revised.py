@@ -38,8 +38,6 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
 
         if sample.get("minicore_seq_id", "Womp") in vcf_samples:
             minicore_seq_exist = True
-        print(sample_name_exist)
-        print(minicore_seq_exist)
         if sample_name_exist and minicore_seq_exist:
             print('IDENTICAL SAMPLE_NAME & MINICORE') 
             print('')
@@ -59,10 +57,10 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
             print('SAMPLE_NAME') 
             print('')
             sample_name = sample.get("*sample_name", "")
-            print(sample_name)
             lat = sample.get("lat", "")
             long = sample.get("long", "")
-
+            print(str(lat).lower()=='nan')
+            print(str(lat).lower())
             if lat == '' or lat == 0 or str(lat).lower() == 'nan':
                 no_coords.append(sample_name)
             else:
@@ -93,7 +91,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
 
     print(f"Number of samples considered = {len(vcf_samples)}")
     print(f"Number of samples WITH coords for {project}: {num_rows}")
-    print(f"Number of samples WITHOUT coords for {project}: {len(samps_no_coords)}")
+    print(f"Number of samples WITHOUT coords for {project}: {len(no_coords)}")
     output_file_path = os.path.join(wd_scripts, "results", ref_genome, "algatr", f"{project}.coords.txt")
     output_file_path_nocoords = os.path.join(wd_scripts, "results", ref_genome, "algatr", f"{project}.no_coords.txt")
     #print(output_file_path)
@@ -104,7 +102,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
     
 
     with open(output_file_path_nocoords, 'w') as file:
-        for samp in samps_no_coords:
+        for samp in no_coords:
             file.write(samp + '\n')
 
 
