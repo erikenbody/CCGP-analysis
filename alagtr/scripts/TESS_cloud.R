@@ -33,8 +33,6 @@ library(algatr)
 library(wingen)
 library(tess3r)
 
-print("Hello world")
-
 #set up log file writing
 log_smk <- function() {
   if (exists("snakemake") & length(snakemake@log) != 0) {
@@ -198,6 +196,30 @@ export_TESS <- function(dat, results) {
   readr::write_csv(xval,
                    file = paste0(output_path, species, "_TESS_xval.csv"),
                    col_names = TRUE)
+
+  # Export plot of CV error
+  if (length(x) > 1) {
+    xval %>% 
+      ggplot2::ggplot() +
+      ggplot2::geom_point(ggplot2::aes(x = K, y = xent)) +
+      ggplot2::geom_line(ggplot2::aes(x = K, y = xent)) +
+      ggplot2::theme_bw() +
+      ggplot2::geom_vline(xintercept = qvals$min_k, 
+                          color = "red", 
+                          linetype = "dashed") +
+      ggplot2::annotate("text", x = qvals$min_k-0.2, y = mean(xval$xent), label = "Minimum K", size = 4, color = "red", angle = 90) +
+      ggplot2::geom_vline(xintercept = qvals$best_k, 
+                          color = "blue", 
+                          linetype = "dashed") +
+      ggplot2::annotate("text", x = qvals$best_k-0.2, y = mean(xval$xent), label = "Best K", size = 4, color = "blue", angle = 90) +
+      ggplot2::ggtitle(paste0(species)) +
+      ggplot2::ylab("Cross-entropy value") +
+      ggplot2::scale_x_continuous(breaks = kvals)
+    
+    ggplot2::ggsave(paste0(output_path, species, "_TESS_xval.png"), 
+           width = 20, height = 15, units = "cm")
+  }
+
 }
 
 peakRAM_exp <-
