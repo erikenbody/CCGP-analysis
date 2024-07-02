@@ -6,16 +6,25 @@ This script converts scaffold names in a `.map` file to numeric chromosome ident
 '''
 
 
-def generate_mapping(input_file, map_file, output_file):
+def generate_mapping(fai_file, map_file, output_file):
 
-    conversion_dict = {}
-    chrom_num = 1
-    with open(input_file, 'r') as f:
+    # conversion_dict = {}
+    # chrom_num = 1
+    # with open(fai_file, 'r') as f:
+    #     for line in f:
+    #         line = line.strip().split()
+    #         conversion_dict[line[0]] = str(chrom_num)
+    #         chrom_num += 1
+
+    entries = []
+    with open(fai_file, 'r') as f:
         for line in f:
             line = line.strip().split()
-            conversion_dict[line[0]] = str(chrom_num)
-            chrom_num += 1
-
+            entries.append((line[0], int(line[1])))
+    entries.sort(key=lambda x: x[1], reverse=True)
+    conversion_dict = {entry[0]: str(idx + 1) for idx, entry in enumerate(entries)}
+    #for contig, number in conversion_dict.items():
+        #print(f"{contig}: {number}")
     # read bim file and replace the scaffold names with numbering 1:n (n = number of scaffolds)
     updated_lines = []
     with open(map_file, 'r') as f:
