@@ -71,26 +71,26 @@ export_admix <- function(output_path, species, cv_scores) {
                    file = paste0(output_path, species, "_best_K.txt"),
                    col_names = TRUE)
   
-  # # Export plot of CV error
-  # cv_scores %>% 
-  #   ggplot2::ggplot() +
-  #   ggplot2::geom_point(ggplot2::aes(x = kval, y = cv)) +
-  #   ggplot2::geom_line(ggplot2::aes(x = kval, y = cv)) +
-  #   ggplot2::theme_bw() +
-  #   ggplot2::geom_vline(xintercept = cv_scores$min_k, 
-  #                       color = "red", 
-  #                       linetype = "dashed") +
-  #   ggplot2::annotate("text", x = cv_scores$min_k-0.2, y = mean(cv_scores$cv), label = "Minimum K", size = 4, color = "red", angle = 90) +
-  #   ggplot2::geom_vline(xintercept = cv_scores$best_k, 
-  #                       color = "blue", 
-  #                       linetype = "dashed") +
-  #   ggplot2::annotate("text", x = cv_scores$best_k-0.2, y = mean(cv_scores$cv), label = "Best K", size = 4, color = "blue", angle = 90) +
-  #   ggplot2::ggtitle(paste0(species, " admixture results")) +
-  #   ggplot2::ylab("Cross-validation score") +
-  #   ggplot2::scale_x_continuous(breaks = cv_scores$kval)
-  # 
-  # ggplot2::ggsave(paste0(output_path, species, "_admixture_cv.png"), 
-  #                 width = 20, height = 15, units = "cm")
+  # Export plot of CV error
+  cv_scores %>% 
+    ggplot2::ggplot() +
+    ggplot2::geom_point(ggplot2::aes(x = kval, y = cv)) +
+    ggplot2::geom_line(ggplot2::aes(x = kval, y = cv)) +
+    ggplot2::theme_bw() +
+    ggplot2::geom_vline(xintercept = cv_scores$min_k, 
+                        color = "red", 
+                        linetype = "dashed") +
+    ggplot2::annotate("text", x = cv_scores$min_k-0.2, y = mean(cv_scores$cv), label = "Minimum K", size = 4, color = "red", angle = 90) +
+    ggplot2::geom_vline(xintercept = cv_scores$best_k, 
+                        color = "blue", 
+                        linetype = "dashed") +
+    ggplot2::annotate("text", x = cv_scores$best_k-0.2, y = mean(cv_scores$cv), label = "Best K", size = 4, color = "blue", angle = 90) +
+    ggplot2::ggtitle(paste0(species, " admixture results")) +
+    ggplot2::ylab("Cross-validation score") +
+    ggplot2::scale_x_continuous(breaks = cv_scores$kval)
+  
+  ggplot2::ggsave(paste0(output_path, species, "_admixture_cv.png"), 
+                  width = 20, height = 15, units = "cm")
 }
 
 export_admix(output_path, species, cv_scores)
