@@ -421,6 +421,8 @@ rule find_best_k:
     params:
         species = config['final_prefix'],
         output_path = "results/{refGenome}/algatr/admixture/logs/"
+    conda:
+        "envs/algatr.yml"
     log:
         "logs/{refGenome}/algatr/{prefix}_cvscores.txt"
     output: 
