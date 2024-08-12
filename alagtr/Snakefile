@@ -116,6 +116,7 @@ rule algatr_tess:
         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
         #pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #this doesnt have samples with coordinates removed included
         pruned = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",#vcf with samples with missing coordinates removed
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
         prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
         #coords = "results/{refGenome}/QC/{prefix}.coords.txt",
@@ -431,3 +432,23 @@ rule find_best_k:
         admix2 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png"
     script:
         "scripts/admixture_cloud.R" 
+
+rule one_plot_to_rule_them_all:
+    input: 
+        cv_errors = "results/{refGenome}/algatr/admixture/{prefix}_best_K.txt",
+        tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        xval = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        eigenval = "results/{refGenome}/algatr/{prefix}.eigenval"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_bigplot.txt"
+    conda:
+        "envs/pie.yml"
+    params:
+        admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}"
+    output:
+        out = "results/{refGenome}/algatr/{prefix}_plots_for_kicking_yourself_in_the_head.pdf"
+    script:
+        "scripts/big_plot_energy.R"
+

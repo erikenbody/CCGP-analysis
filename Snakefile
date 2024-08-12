@@ -13,22 +13,6 @@ def get_scaffolds(fai):
                 scaffolds.append(scaffold)
     return scaffolds
 
-# rename_contigs = config["rename_chromosome"]
-# def get_chrom_names(contigs, output_contigs):
-#     if rename_contigs:
-#         if contigs.is_dir():
-#             df = pd.read_csv(contigs, sep='\t')
-#             with open(output_contigs, 'w') as output_file:
-#                 for i, row in df.iterrows():
-#                     sequence_name = row["sequence_name"]
-#                     accession = row["accession"]
-#                     line = f"{accession}\t{sequence_name}\n"
-#                     output_file.write(line)
-#             return output_contigs
-#     else:
-#         with open(output_contigs, 'w') as output_file:
-#             pass
-
 fai = Path("results", config["refgenome"], "data", "genome", config["refgenome"] + ".fna.fai")
 pops = Path("results", config["refgenome"], "algatr", config["final_prefix"] + "_populations")
 contigs = Path("results", config["refgenome"], "algatr", config["final_prefix"] + "_contigs.tsv")
@@ -72,9 +56,12 @@ output = [
         # expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
-        #expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # admixture
-        expand("results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
+        expand("results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/algatr/{prefix}_plots_for_kicking_yourself_in_the_head.pdf", refGenome = config['refgenome'], prefix=config['final_prefix'])
+
+
         
 ]
 if config["rename_contigs"]:
@@ -88,14 +75,14 @@ rule all:
     input: output
 
 include: "ccgp/Snakefile"
-include: "reference/Snakefile"
+#nclude: "reference/Snakefile"
 include: "local_pca/Snakefile"
 include: "alagtr/Snakefile"
 include: "pop_analysis/Snakefile"
 #include: "../ccgp_feems/Snakefile" #need to get envs set up for this to work
 
-if config['bed']:
-   include: "postprocess/Snakefile"
-   include: "trackhub/Snakefile" 
-else:
-   include: "postprocess_variant/Snakefile"
+# if config['bed']:
+#    include: "postprocess/Snakefile"
+#    include: "trackhub/Snakefile" 
+# else:
+#    include: "postprocess_variant/Snakefile"
