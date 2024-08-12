@@ -29,8 +29,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   
   # Load the cross-validation error data
   cv_errors <- read_delim(cv_errors_file, skip = 2, col_names = FALSE, delim = ": CV error=")
-  print(cv_errors)
-  print("hey")
+
   cv_errors$X1 <- as.numeric(gsub("K=", "", cv_errors$X1))
   names(cv_errors) <- c("K", "CV_Error")
   
@@ -60,7 +59,13 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     pull(K)
   
   # Load the admixture data for the best K value
-  admixture_data <- read_delim(paste0(admixture_path,".", admix_best_k, ".Q"), col_names = c("K1", "K2", "K3"), delim = " ")
+  num_columns <- as.numeric(admix_best_k)  # Convert admix_best_k to a numeric value
+  column_names <- paste0("K", 1:num_columns)  # Generate column names from K1 to K{num_columns}
+
+  # Read the admixture data with dynamic column names
+  admixture_data <- read_delim(paste0(admixture_path, ".", admix_best_k, ".Q"), 
+                              col_names = column_names, 
+                              delim = " ")
   admixture_data$Sample <- eigenvec$Sample
   admixture_data <- inner_join(coords, admixture_data, by = "Sample")
   

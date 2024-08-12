@@ -433,7 +433,7 @@ rule find_best_k:
     script:
         "scripts/admixture_cloud.R" 
 
-rule one_plot_to_rule_them_all:
+rule admixture_composite:
     input: 
         cv_errors = "results/{refGenome}/algatr/admixture/{prefix}_best_K.txt",
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
@@ -448,7 +448,7 @@ rule one_plot_to_rule_them_all:
     params:
         admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}"
     output:
-        out = "results/{refGenome}/algatr/{prefix}_plots_for_kicking_yourself_in_the_head.pdf"
+        out = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf"
     script:
-        "scripts/big_plot_energy.R"
+        "scripts/create_admixture_composite.R"
 
