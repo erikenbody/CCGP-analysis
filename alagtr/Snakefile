@@ -370,21 +370,22 @@ rule run_admixture:
         bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
         fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
     output:
-        Q = "results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.Q",
-        P = "results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.P"
+        Q = "results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q",
+        P = "results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.{seed}.P"
     params:
         K = "{K}"
     log:
-        "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}.log"
+        "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}_seed{seed}.log"
     conda:
         "envs/admixture.yml"
     shell:
         """
-        admixture --cv=10 {input.bed} {params.K} > {log}
+        admixture --cv=5 --seed={wildcards.seed} {input.bed} {params.K} > {log}
+        
         mv {wildcards.prefix}.{wildcards.K}.P {output.P}
         mv {wildcards.prefix}.{wildcards.K}.Q {output.Q}
         """
-
+        
 # rule find_best_k:
 #     input:
 #         expand("results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.Q", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -418,7 +419,13 @@ rule find_best_k:
     retrieve cv scores and calculate best and min k 
     """
     input:
-        expand("results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}.log", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix'])
+        expand(
+            "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}_seed{seed}.log",
+            K=range(1, 11), 
+            seed=[42, 420, 69, 666, 80085],
+            refGenome=config['refgenome'], 
+            prefix=config['final_prefix']
+        )
     params:
         species = config['final_prefix'],
         output_path = "results/{refGenome}/algatr/admixture/logs/"
@@ -435,7 +442,7 @@ rule find_best_k:
 
 rule admixture_composite:
     input: 
-        cv_errors = "results/{refGenome}/algatr/admixture/{prefix}_best_K.txt",
+        cv_errors = "results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt",
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
         xval = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
