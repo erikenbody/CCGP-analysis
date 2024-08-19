@@ -436,7 +436,8 @@ rule find_best_k:
     output: 
     # Exported files are as follows:
         admix1 = "results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt",
-        admix2 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png"
+        admix2 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png",
+        admix3 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_deltak.png"
     script:
         "scripts/admixture_cloud.R" 
 
