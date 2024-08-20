@@ -3,5 +3,4 @@ jobs: 10
 keep-going: True
 rerun-incomplete: True
 config: config_file="config.yaml"
-rerun-triggers: "mtime"
 conda-prefix: /scratch2/erik/CCGP-reruns/stable_conda_envs
