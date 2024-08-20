@@ -444,6 +444,8 @@ rule find_best_k:
 rule admixture_composite:
     input: 
         cv_errors = "results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt",
+        admx_png_path = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png",
+        evanno_png_path = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_deltak.png",
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
         xval = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt",

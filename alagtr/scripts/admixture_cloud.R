@@ -145,7 +145,7 @@ export_admix <- function(output_path, species, cv_scores) {
     ggtitle(paste0(species, " delta K"))
   
   ggplot2::ggsave(paste0(output_path, species, "_admixture_deltak.png"),
-                  width = 20, height = 15, units = "cm")
+                  width = 20, height = 15, units = "cm", device = cairo_pdf)
 }
 
 export_admix(output_path, species, cv_scores)
