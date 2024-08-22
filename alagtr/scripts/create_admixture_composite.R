@@ -248,16 +248,25 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   df_matches <- compare_bestk_coefficients %>% 
     filter(pop_assignment.x == pop_assignment.y)
   
+  df_matches4plot <- df_matches %>%
+    select(-K_value) %>% 
+    pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
+    mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
+    group_by(Sample, type) %>%
+    filter(K_value == max(K_value, na.rm = TRUE)) %>%
+    ungroup() %>%
+    select(Sample, K_value, type) %>%
+    pivot_wider(id_cols = "Sample", values_from = "K_value", names_from = "type") %>% 
+    mutate(qvalue_diff = abs(admixture - tess)) %>% 
+    arrange(qvalue_diff) 
+  
   df_mismatches <- compare_bestk_coefficients %>% 
     filter(pop_assignment.x!=pop_assignment.y)
   
-  # Reshape the tibble to long format
   df_long <- df_mismatches %>%
     select(-K_value) %>% 
     pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
     mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
-    #mutate(best_tess = paste0("K", pop_assignment.x,".y")) %>% 
-    #filter(best_tess == K_type)
     group_by(Sample, type) %>%
     filter(K_value == max(K_value, na.rm = TRUE)) %>%
     ungroup() %>%
@@ -351,14 +360,29 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     labs(x = "Population", y = "Number of Ks in run", fill = "Correlation") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  p9 <-   
+  p9_title = paste0("Matching assignments for Tess best K value: K", tess_best_k)
+  
+  p9.5 <- df_matches4plot %>% 
+    ggplot(aes(x = reorder(Sample, qvalue_diff), y = qvalue_diff)) +
+      geom_col() +
+      labs(x = NULL, y = "Abs. Q value difference", title = p9_title) +
+      geom_hline(yintercept = mean(df_matches4plot$qvalue_diff), color = "red") +
+      theme_bw() +
+      theme(axis.text.x = element_blank()) +
+      ylim(c(0,0.5))
+  
+  p9.25_title = paste0("Mismatching assignments for Tess best K value: K", tess_best_k)
+  
+  p9.25 <-   
     ggplot(df_long, aes(x = reorder(Sample, K_value), y = K_value, fill = type)) +
-    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-    labs(x = NULL, y = "Max Q value", title = "Mismatches Tess vs Admixture") +
+    geom_col(position = position_dodge()) +
+    labs(x = NULL, y = "Max Q value", title = p9.25_title) +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     lims(y = c(0,1)) +
     geom_hline(yintercept = 0.50, color = "red")
+  
+  p9 <- p9.5/p9.25
   
   layout <- "
             AABB
