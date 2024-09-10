@@ -34,30 +34,17 @@ def get_k(wc):
     out = [
         # *expand("results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt", **wc, k=k_values),
         # *expand("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
 
         # *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.roh.gz", **wc, k=k_values),
         # *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh", **wc, k=k_values),
         # *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
 
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz.csi", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_snp_positions/position_pop_{k}.txt.gz", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz", **wc, k=k_values),
-
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink.bed", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink_ORIG.map", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_plink.map", **wc, k=k_values),
-        
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux/Output_d2_{prefix}_pop_{k}_plink", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux/Output_Ne_{prefix}_pop_{k}_plink", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux/OUTPUT_{prefix}_pop_{k}_plink", **wc, k=k_values),
-        *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}.png", **wc, k=k_values),
+        #
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
         # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz", **wc, k=k_values, seed = seeds),
-
         
     ]
     
@@ -74,7 +61,7 @@ checkpoint distinguish_populations:
     params:
         project_id = "{prefix}",
         ref_genome = "{refGenome}",
-        manual_k_assignment = "NA",
+        manual_k_assignment = config['manual_k_assignment'],
         threshold_qval = 0.80
     script:
         "scripts/population_assignment.py"
@@ -211,20 +198,19 @@ rule subsample_snps:
         bcftools index {output.subsamp}
         """
 
-
 rule pop_plink_bed_pops:
     '''
     Makes initial map and ped files from GONE_contigs vcf.
     '''
     input:
-        subsamp = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k.vcf.gz",
+        subsamp = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz",
         indel_absent_vcf = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz",
-
     output:
-        plink_bed = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink.bed",
-        plink_map_temp = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink_ORIG.map"
+        plink_bed = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink.bed",
+        plink_map_temp = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink_ORIG.map",
+        plink_out = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink.ped"
     params:
-        plink_out = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink"
+        plink_out = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink"
     conda:
         "envs/plink1_9.yml"
     shell:
@@ -239,9 +225,9 @@ rule pop_rename_chrom_plink:
     Renames chromosomes 1-n. This is necessary for GONE to execute properly. Confirmed same number of lines in ORIG.map and .map.
     '''
     input:
-        map_temp = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink_ORIG.map",
+        map_temp = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink_ORIG.map",
     output:
-        mapp = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_plink.map",
+        mapp = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_seed_{seed}_plink.map",
     params:
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     script:
@@ -249,18 +235,18 @@ rule pop_rename_chrom_plink:
 
 rule GONE:
     input:
-        mapp = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_plink.map",
-        ped = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_plink.ped",
+        mapp = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_seed_{seed}_plink.map",
+        ped = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink.ped",
     output:
-        map_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux/{prefix}_pop_{k}_plink.map",
-        ped_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux/{prefix}_pop_{k}_plink.ped",
-        GONE_out_d2 = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/Output_d2_{prefix}_pop_{k}_plink",
-        GONE_out_Ne = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/Output_Ne_{prefix}_pop_{k}_plink",
-        GONE_output = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/OUTPUT_{prefix}_pop_{k}_plink",
+        map_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux/{prefix}_pop_{k}_seed_{seed}_plink.map",
+        ped_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux/{prefix}_pop_{k}_seed_{seed}_plink.ped",
+        GONE_out_d2 = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_d2_{prefix}_pop_{k}_seed_{seed}_plink",
+        GONE_out_Ne = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_Ne_{prefix}_pop_{k}_seed_{seed}_plink",
+        GONE_output = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/OUTPUT_{prefix}_pop_{k}_seed_{seed}_plink",
     params:
-        GONE_dwn_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}",
-        GONE_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/GONE/Linux",
-        ccgp_id = '{prefix}_pop_{k}_plink'
+        GONE_dwn_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}",
+        GONE_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux",
+        ccgp_id = '{prefix}_pop_{k}_seed_{seed}_plink'
     shadow: "full"
     shell:
         '''
@@ -278,22 +264,48 @@ rule GONE:
 
         cd {params.GONE_dir} 
         bash script_GONE.sh {params.ccgp_id}
+
         mv O*{params.ccgp_id} ../../
         '''
 
 rule pop_plot_GONE_output:
     input:
-        GONE_out_d2 = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/Output_d2_{prefix}_pop_{k}_plink",
-        GONE_out_Ne = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/Output_Ne_{prefix}_pop_{k}_plink",
-        GONE_output = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}/OUTPUT_{prefix}_pop_{k}_plink",
-        
+        GONE_out_d2 = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_d2_{prefix}_pop_{k}_seed_{seed}_plink",
+        GONE_out_Ne = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_Ne_{prefix}_pop_{k}_seed_{seed}_plink",
+        GONE_output = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/OUTPUT_{prefix}_pop_{k}_seed_{seed}_plink",
     output:
-        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}.png"
+        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png"
     params:
         project_id = "{prefix}",
-        population_id = "{k}"
-    script: 
+        population_id = "{k}",
+        seed = "{seed}"
+    script:
         "scripts/plot_GONE.py"
+
+def get_all_GONE_out_Ne(wildcards):
+    return expand(
+        "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_Ne_{prefix}_pop_{k}_seed_{seed}_plink",
+        refGenome=wildcards.refGenome, prefix=wildcards.prefix, k=wildcards.k, seed=range(1, 11)
+    )
+
+rule pop_plot_all_seeds:
+    input:
+        GONE_out_Ne = get_all_GONE_out_Ne
+    output:
+        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png"
+    params:
+        project_id = "{prefix}",
+        population_id = "{k}",
+        seeds = list(range(1, 11))
+    script:
+        "scripts/plot_GONE_all_seeds.py"
+
+rule pop_get_k_files:
+    # dummy rule to get all of the files split by k pops
+    input: get_k
+    output: touch("results/{refGenome}/pop_analysis/{prefix}_k.done")
+
+
 
 ###### ROH AND PI RULES####################
 
@@ -341,13 +353,6 @@ rule pop_froh:
         min_roh_size = 500000
     script:
         "scripts/froh.py"
-
-rule pop_get_k_files:
-    # dummy rule to get all of the files split by k pops
-    input: get_k
-    output: touch("results/{refGenome}/pop_analysis/{prefix}_k.done")
-
-
 
 ### THESE 2 RULES RUN IF "RENAME_CONTIGS" == TRUE. ###
 rule get_chromosome_names:
