@@ -33,7 +33,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
         minicore_seq_exist = False
         # if sample.get("*sample_name", "Womp_Womp") in vcf_samples:
         #     sample_name_exist = True
-        if sample["*sample_name"] in vcf_samples:
+        if str(sample["*sample_name"]) in vcf_samples:
             sample_name_exist = True
 
         if sample.get("minicore_seq_id", "Womp") in vcf_samples:
@@ -41,7 +41,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
         if sample_name_exist and minicore_seq_exist:
             print('IDENTICAL SAMPLE_NAME & MINICORE') 
             print('')
-            sample_name = sample.get("*sample_name", "")
+            sample_name = str(sample.get("*sample_name", ""))
             print(sample_name)
             lat = sample.get("lat", "")
             long = sample.get("long", "")
@@ -56,7 +56,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
         if sample_name_exist: #IF THE ENTRY USES SAMPLE_NAMES  
             print('SAMPLE_NAME') 
             print('')
-            sample_name = sample.get("*sample_name", "")
+            sample_name = str(sample.get("*sample_name", ""))
             lat = sample.get("lat", "")
             long = sample.get("long", "")
             print(str(lat).lower()=='nan')
@@ -65,6 +65,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
                 no_coords.append(sample_name)
             else:
                 data_list.append({"Sample Name": sample_name, "Long": float(long), "Lat": float(lat)})
+            print(sample_name)
             samps_no_coords.remove(sample_name)
         #print(sample_name)
         if minicore_seq_exist:
@@ -78,6 +79,7 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
                 no_coords.append(sample_name)
             else:
                 data_list.append({"Sample Name": sample_name, "Long": float(long), "Lat": float(lat)})
+            print(sample_name)
             samps_no_coords.remove(sample_name)
         # else:
         #     no_coords.append(sample)

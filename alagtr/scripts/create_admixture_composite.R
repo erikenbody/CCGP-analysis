@@ -17,7 +17,7 @@ log_smk <- function() {
 log_smk()
 
 create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file, 
-                         eigenvec_file, eigenval_file, admixture_path, output_path) {
+                         eigenvec_file, eigenval_file, admixture_path, output_path, output_match) {
   # Load the coordinate data
   coords <- read_tsv(coords_file, col_names = c("Sample", "Longitude", "Latitude"))
   
@@ -100,11 +100,11 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   
   # Read the admixture data with dynamic column names
   
-  q_files <- list.files(path = dirname(admixture_path), pattern = "\\.Q$", full.names = TRUE)
+  q_files <- list.files(path = dirname(admixture_path), pattern = "\\.42\\.Q$", full.names = TRUE)
   
   # Function to read and process each .Q file
   process_q_file <- function(file) {
-    admix_k <- str_extract(file, "\\d+(?=\\.Q)")
+    admix_k <- str_extract(file, "\\d+(?=\\.42\\.Q)")
     column_names <- paste0("K", seq_len(as.numeric(admix_k)))
     admixture_data <- read_delim(file, col_names = column_names, delim = " ", show_col_types = FALSE)
     admixture_data$Sample <- eigenvec$Sample
@@ -116,7 +116,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   all_admixture_data <- map_df(q_files, process_q_file)
   
   #for simplicity, just load admixture_data as the relavent Q. Easier to plot
-  admixture_data <- read_delim(paste0(admixture_path, ".", admix_best_k, ".Q"), 
+  admixture_data <- read_delim(paste0(admixture_path, ".", admix_best_k, ".42.Q"), 
                                col_names = column_names, 
                                delim = " ")
   admixture_data$Sample <- eigenvec$Sample
@@ -224,7 +224,8 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   # Combine all results into a single data frame
   final_result <- bind_rows(results_list)
   renamed_dfs <- bind_rows(renamed_list)
-  
+  write_csv(renamed_dfs, output_match)
+
   # Reshape data from wide to long format
   heatmap_data <- final_result %>%
     pivot_longer(-K_value, names_to = "K_column", values_to = "Value") %>% 
@@ -237,42 +238,70 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     filter(K_value == tess_best_k) %>% 
     select(ends_with(".x"), -K_value) 
   
-  admx_assign <- temp %>% 
-    mutate(Category = names(temp)[max.col(temp)]) %>% 
-    mutate(pop_assignment = gsub("K", "", gsub(".x", "", Category, fixed = T))) %>% 
-    mutate(Sample = renamed_tess_best_K$Sample) %>% 
-    select(Sample, pop_assignment)
+  if (nrow(temp)== 0){
+    p9 <- ggplot() + geom_blank() + labs(title = "no overlap in K assignments")
+  } else {
+    admx_assign <- temp %>% 
+      mutate(Category = names(temp)[max.col(temp)]) %>% 
+      mutate(pop_assignment = gsub("K", "", gsub(".x", "", Category, fixed = T))) %>% 
+      mutate(Sample = renamed_tess_best_K$Sample) %>% 
+      select(Sample, pop_assignment)
+    
+    compare_bestk_coefficients <- left_join(admx_assign, renamed_tess_best_K, by = "Sample")
+    
+    df_matches <- compare_bestk_coefficients %>% 
+      filter(pop_assignment.x == pop_assignment.y)
+    
+    df_matches4plot <- df_matches %>%
+      select(-K_value) %>% 
+      pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
+      mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
+      group_by(Sample, type) %>%
+      filter(K_value == max(K_value, na.rm = TRUE)) %>%
+      ungroup() %>%
+      select(Sample, K_value, type) %>%
+      pivot_wider(id_cols = "Sample", values_from = "K_value", names_from = "type") %>% 
+      mutate(qvalue_diff = abs(admixture - tess)) %>% 
+      arrange(qvalue_diff) 
+    
+    df_mismatches <- compare_bestk_coefficients %>% 
+      filter(pop_assignment.x!=pop_assignment.y)
+    
+    df_long <- df_mismatches %>%
+      select(-K_value) %>% 
+      pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
+      mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
+      group_by(Sample, type) %>%
+      filter(K_value == max(K_value, na.rm = TRUE)) %>%
+      ungroup() %>%
+      select(Sample, K_value, type) %>%
+      arrange(K_value)
+
+    p9_title = paste0("Matching assignments for Tess best K value: K", tess_best_k)
   
-  compare_bestk_coefficients <- left_join(admx_assign, renamed_tess_best_K, by = "Sample")
+    p9.5 <- df_matches4plot %>% 
+      ggplot(aes(x = reorder(Sample, qvalue_diff), y = qvalue_diff)) +
+        geom_col() +
+        labs(x = NULL, y = "Abs. Q value difference", title = p9_title) +
+        geom_hline(yintercept = mean(df_matches4plot$qvalue_diff), color = "red") +
+        theme_bw() +
+        theme(axis.text.x = element_blank()) +
+        ylim(c(0,0.5))
+    
+    p9.25_title = paste0("Mismatching assignments for Tess best K value: K", tess_best_k)
+    
+    p9.25 <-   
+      ggplot(df_long, aes(x = reorder(Sample, K_value), y = K_value, fill = type)) +
+      geom_col(position = position_dodge()) +
+      labs(x = NULL, y = "Max Q value", title = p9.25_title) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      lims(y = c(0,1)) +
+      geom_hline(yintercept = 0.50, color = "red")
+    
+    p9 <- p9.5/p9.25
   
-  df_matches <- compare_bestk_coefficients %>% 
-    filter(pop_assignment.x == pop_assignment.y)
-  
-  df_matches4plot <- df_matches %>%
-    select(-K_value) %>% 
-    pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
-    mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
-    group_by(Sample, type) %>%
-    filter(K_value == max(K_value, na.rm = TRUE)) %>%
-    ungroup() %>%
-    select(Sample, K_value, type) %>%
-    pivot_wider(id_cols = "Sample", values_from = "K_value", names_from = "type") %>% 
-    mutate(qvalue_diff = abs(admixture - tess)) %>% 
-    arrange(qvalue_diff) 
-  
-  df_mismatches <- compare_bestk_coefficients %>% 
-    filter(pop_assignment.x!=pop_assignment.y)
-  
-  df_long <- df_mismatches %>%
-    select(-K_value) %>% 
-    pivot_longer(cols = starts_with("K"), names_to = "K_type", values_to = "K_value") %>%
-    mutate(type = ifelse(grepl("x", K_type), "admixture", "tess")) %>% 
-    group_by(Sample, type) %>%
-    filter(K_value == max(K_value, na.rm = TRUE)) %>%
-    ungroup() %>%
-    select(Sample, K_value, type) %>%
-    arrange(K_value)
-  
+  }
   # plots -------------------------------------------------------------------
 
   
@@ -360,30 +389,6 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     labs(x = "Population", y = "Number of Ks in run", fill = "Correlation") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  p9_title = paste0("Matching assignments for Tess best K value: K", tess_best_k)
-  
-  p9.5 <- df_matches4plot %>% 
-    ggplot(aes(x = reorder(Sample, qvalue_diff), y = qvalue_diff)) +
-      geom_col() +
-      labs(x = NULL, y = "Abs. Q value difference", title = p9_title) +
-      geom_hline(yintercept = mean(df_matches4plot$qvalue_diff), color = "red") +
-      theme_bw() +
-      theme(axis.text.x = element_blank()) +
-      ylim(c(0,0.5))
-  
-  p9.25_title = paste0("Mismatching assignments for Tess best K value: K", tess_best_k)
-  
-  p9.25 <-   
-    ggplot(df_long, aes(x = reorder(Sample, K_value), y = K_value, fill = type)) +
-    geom_col(position = position_dodge()) +
-    labs(x = NULL, y = "Max Q value", title = p9.25_title) +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    lims(y = c(0,1)) +
-    geom_hline(yintercept = 0.50, color = "red")
-  
-  p9 <- p9.5/p9.25
-  
   layout <- "
             AABB
             AABB
@@ -409,7 +414,8 @@ combined_plot <- create_plots(
   eigenvec_file = snakemake@input[["eigenvec"]],
   eigenval_file = snakemake@input[["eigenval"]],
   admixture_path = snakemake@params[["admixture_path"]],
-  output_path = snakemake@output[["out"]]
+  output_path = snakemake@output[["out"]],
+  output_match = snakemake@output[["match"]]
 )
 
 # combined_plot <- create_plots(

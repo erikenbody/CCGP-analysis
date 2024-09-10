@@ -386,33 +386,65 @@ rule run_admixture:
         mv {wildcards.prefix}.{wildcards.K}.Q {output.Q}
         """
         
-# rule find_best_k:
-#     input:
-#         expand("results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.Q", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix']),
-#         expand("results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}.log", K=range(1, 11), refGenome = config['refgenome'], prefix=config['final_prefix'])
-#     output:
-#         "results/{refGenome}/algatr/admixture/{prefix}_best_K.txt"
-#     run:
-#         import re
-#         cv_errors = {}
-#         for K in range(1, 11):
-#             log_file = f"results/{wildcards.refGenome}/algatr/admixture/logs/{wildcards.prefix}_admix_K{K}.log"
-#             print(log_file)
-#             with open(log_file) as f:
-#                 for line in f:
-#                     if "CV error (K=" in line:
-#                         match = re.search(r"CV error \(K=(\d+)\): (.+)", line)
-#                         if match:
-#                             k_val = int(match.group(1))
-#                             cv_error = float(match.group(2))
-#                             cv_errors[k_val] = cv_error
+rule evaladmix_env:
+    input:    
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    output:
+        success = touch("results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt")
+    params:
+        dwn_dir = "results/{refGenome}/algatr/admixture/evaladmix"
+    shell:
+        """
+        if [ -f {params.dwn_dir}/evalAdmix/evalAdmix ]; then
+                echo "Directory {params.dwn_dir}/evalAdmix already exists."
+            else
+                echo "Directory {params.dwn_dir}/evalAdmix does not exist. Cloning the repository."
+                rm -rf {params.dwn_dir}/evalAdmix/
+                git clone https://github.com/GenisGE/evalAdmix.git {params.dwn_dir}/evalAdmix
+                cd {params.dwn_dir}/evalAdmix
+                make
+                chmod +x -R evalAdmix
+            fi
+        """
+my_basedir = workflow.current_basedir
 
-#         best_k = min(cv_errors, key=cv_errors.get)
-#         with open(output[0], "w") as f:
-#             f.write(f"Best K: {best_k}\n")
-#             f.write("K values and corresponding CV errors:\n")
-#             for k, err in cv_errors.items():
-#                 f.write(f"K={k}: CV error={err}\n")
+rule evaladmix:
+    input:    
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        success = touch("results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt")
+        #Q = expand("results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q", 
+        #K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #P = expand("results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.{seed}.P", 
+        #K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix']),
+    output:
+        evalout = "results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.txt",
+        evalpng = "results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.png"
+    params:
+        dwn_dir = "results/{refGenome}/algatr/admixture/evaladmix",
+        plink = "results/{refGenome}/algatr/admixture/{prefix}",
+        ad_dir = "results/{refGenome}/algatr/admixture/",
+        vis = "results/{refGenome}/algatr/admixture/evaladmix/evalAdmix/visFuns.R",
+    conda:
+        "envs/pie.yml"
+    shell:
+        """
+        pfile={params.ad_dir}/P_files/{wildcards.prefix}.{wildcards.K}.{wildcards.seed}.P
+        qfile={params.ad_dir}/Q_files/{wildcards.prefix}.{wildcards.K}.{wildcards.seed}.Q
+
+        {params.dwn_dir}/evalAdmix/evalAdmix -plink {params.plink} -fname $pfile -qname $qfile -o {output.evalout} -P 5
+        
+        Rscript {my_basedir}/scripts/plot_evalAdmix.R $qfile {output.evalout} {output.evalpng} {wildcards.K} {params.vis} {wildcards.prefix}
+        """
+
+rule combine:
+    input:
+        expand("results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.png",
+            K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix'])
+    output:
+        touch("results/{refGenome}/algatr/admixture/evaladmix/{prefix}_complete.txt")
+    shell:
+        "echo evaladmix complete"
 
 rule find_best_k:
     """
@@ -458,7 +490,8 @@ rule admixture_composite:
     params:
         admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}"
     output:
-        out = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf"
+        out = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf",
+        match = "results/{refGenome}/algatr/{prefix}_admixture_tess_merged.csv"
     script:
         "scripts/create_admixture_composite.R"
 
