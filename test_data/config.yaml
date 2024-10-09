@@ -10,7 +10,7 @@ trackhub_email: erik.enbody@gmail.com
 grid: "/scratch2/erik/ccgp_feems/california_grid.txt"
 sample_id: "*sample_name" #define which database ID to use
 rename_contigs: False
-
+manual_k_assignment: 2
 ##############################
 # Variables you *might* need to change
 ##############################
@@ -38,7 +38,8 @@ missingness: 0.25 #snps with missingness greater than this value will be filtere
 scaffolds_to_exclude: "mtDNA,Y" #comma separated, no spaces list of scaffolds to exclude from final clean vcfs. Set to blank to disable.
 
 cov_threshold_stdev: 2
-
+qvalue_threshold: 0.8
+method: "tess"
 
 
 
