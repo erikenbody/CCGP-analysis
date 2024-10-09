@@ -28,7 +28,6 @@ def get_k(wc):
     if pops_dir.is_dir():
         
         files = [file.name for file in pops_dir.iterdir() if file.is_file()]
-        
         k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
         seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
     out = [
@@ -41,7 +40,6 @@ def get_k(wc):
         # *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
 
-        #
         #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
         # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz", **wc, k=k_values, seed = seeds),
@@ -49,29 +47,53 @@ def get_k(wc):
     ]
     
     return out
-    
+
 checkpoint distinguish_populations:
     input:
-        matrix = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv"
+        tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"
     output:
-        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
-        outdir = directory("results/{refGenome}/pop_analysis/{prefix}_populations")
+        out1 = "results/{refGenome}/pop_analysis/{prefix}_admixture_final.pdf",
+        outdir = directory("results/{refGenome}/pop_analysis/{prefix}_populations"),
+        out2 = "results/{refGenome}/pop_analysis/{prefix}_tess_final.pdf",
+        all_qvalues = "results/{refGenome}/pop_analysis/{prefix}_all_qvalues.txt",
+        pops_done = touch("results/{refGenome}/pop_analysis/{prefix}_populations-done.txt")
     conda:
-        "envs/assign_pops.yml"
+        "envs/pie.yml"
+    log:
+        log = "logs/{refGenome}/pop_analysis/{prefix}_plot_and_distinguish_pops.txt"
     params:
-        project_id = "{prefix}",
-        ref_genome = "{refGenome}",
+        admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}",
         manual_k_assignment = config['manual_k_assignment'],
-        threshold_qval = 0.80
+        project_id = "{prefix}",
+        threshold_qval = 0.80,
+        method = "admixture"
     script:
-        "scripts/population_assignment.py"
+        "scripts/final_admixture_plot.R"
+
+# checkpoint distinguish_populations:
+#     input:
+#         matrix = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv"
+#     output:
+#         pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+#         outdir = directory("results/{refGenome}/pop_analysis/{prefix}_populations"),
+#     conda:
+#         "envs/assign_pops.yml"
+#     params:
+#         project_id = "{prefix}",
+#         ref_genome = "{refGenome}",
+#         manual_k_assignment = config['manual_k_assignment'],
+#         threshold_qval = 0.80
+#     script:
+#         "scripts/population_assignment.py"
     
 rule pop_bcf_populations:
     input:
         pops = "results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt",
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        pops_done = ancient("results/{refGenome}/pop_analysis/{prefix}_populations-done.txt")
+        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt"
     output:
         pop_vcf = temp("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz"),
         index = temp("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi")
@@ -311,7 +333,7 @@ rule pop_get_k_files:
 
 rule pop_roh:
     input:
-        pop_vcf = ancient("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz"),
+        pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
     output:
         roh = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.roh.gz",
         rg = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh"
