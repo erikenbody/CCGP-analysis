@@ -8,6 +8,7 @@ final_prefix: "41-Callipepla" # prefix for final output files
 refgenome: "GCA_023055505.1"
 bed: True
 trackhub_email: erik.enbody@gmail.com
+rename_contigs: True
 
 ##############################
 # Variables you *might* need to change
