@@ -80,6 +80,7 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   # Get envlayers -----------------------------------------------------------
   if (incl_env) {
     env <- get_envlayers(env_path = paste0(snakemake@scriptdir, "/../../data/"), rmislands = rmislands)
+    #env <- get_envlayers(env_path = "/scratch2/erik/CCGP-reruns/data/", rmislands = rmislands)
   } else {
     env <- NULL
   }

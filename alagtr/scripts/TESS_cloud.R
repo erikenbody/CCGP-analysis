@@ -55,6 +55,14 @@ kvals = snakemake@params[[4]]
 output_path = snakemake@params[[5]]
 incl_env = as.logical(snakemake@params[[6]])
 
+# species <- "5-Mirounga"
+# data_path <- "projects/5-Mirounga/results/GCA_029215605.1/"
+# rmislands = TRUE
+# kvals <- "1:10"
+# output_path <- "projects/5-Mirounga/results/GCA_029215605.1/algatr"
+# incl_env <- TRUE
+# source("/scratch2/erik/CCGP-reruns/alagtr/scripts/general_functions.R")
+
 #need to interpret the kvals string as an expression
 kvals <- try(eval(parse(text = kvals)), silent = TRUE)
 
@@ -120,17 +128,20 @@ peakRAM_tess <-
 
 # Krige Q values ----------------------------------------------------------
 
-if (!is.null(incl_env) & length(kvals) > 1) {
-  grid <- raster::aggregate(dat$envlayers[[1]], fact = 6)
-  reproj <- reproject(coords = dat$coords, env = grid)
+# Uncomment if you want kriging
+# fails for K=1, so removing
+
+# if (!is.null(incl_env) & length(kvals) > 1) {
+#   grid <- raster::aggregate(dat$envlayers[[1]], fact = 6)
+#   reproj <- reproject(coords = dat$coords, env = grid)
   
-  peakRAM_krig <-
-    peakRAM::peakRAM(
-      krig_admix <- algatr::tess_krig(results$qmat, 
-                                      reproj$coords_proj, 
-                                      reproj$env_proj)
-    )
-}
+#   peakRAM_krig <-
+#     peakRAM::peakRAM(
+#       krig_admix <- algatr::tess_krig(results$qmat, 
+#                                       reproj$coords_proj, 
+#                                       reproj$env_proj)
+#     )
+# }
 
 
 # Export results ----------------------------------------------------------
@@ -157,11 +168,13 @@ export_TESS <- function(dat, results) {
                      col_names = TRUE)
 
     # Export raster of kriged Q values
-    if (!is.null(incl_env)) {
-      terra::writeRaster(krig_admix,
-                         paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
-                         overwrite = TRUE)
-   }
+    # comment out if you make and want to save rasters
+
+    # if (!is.null(incl_env)) {
+    #   terra::writeRaster(krig_admix,
+    #                      paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
+    #                      overwrite = TRUE)
+    # }
   }
   
   if (length(kvals) == 1) {
@@ -230,22 +243,11 @@ peakRAM_exp <-
 
 # Export RAM usage --------------------------------------------------------
 
-if (!is.null(incl_env) & length(kvals) > 1) {
-  RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
-                          as.data.frame(peakRAM_dos),
-                          as.data.frame(peakRAM_tess),
-                          as.data.frame(peakRAM_krig),
-                          as.data.frame(peakRAM_exp)) %>% 
-    dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
-}
-
-if (is.null(incl_env) & length(kvals) == 1) {
-  RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
-                          as.data.frame(peakRAM_dos),
-                          as.data.frame(peakRAM_tess),
-                          as.data.frame(peakRAM_exp)) %>% 
-    dplyr::mutate(fxn = c("import", "dosage", "run", "export"))
-}
+RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
+                        as.data.frame(peakRAM_dos),
+                        as.data.frame(peakRAM_tess),
+                        as.data.frame(peakRAM_exp)) %>% 
+  dplyr::mutate(fxn = c("import", "dosage", "run", "export"))
 
 readr::write_csv(RAM,
                  file = paste0(output_path, species, "_TESS_peakRAM.csv"))
