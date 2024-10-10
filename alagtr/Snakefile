@@ -137,7 +137,7 @@ rule algatr_tess:
     output: 
     # Exported files are as follows:
         tess1 = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
-        tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
+        #tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
         tess4 = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
         tess5 = "results/{refGenome}/algatr/{prefix}_TESS_peakRAM.csv",
         tess6 = "results/{refGenome}/algatr/{prefix}_TESS_xval.png"
@@ -412,7 +412,7 @@ my_basedir = workflow.current_basedir
 rule evaladmix:
     input:    
         bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
-        success = touch("results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt")
+        success = "results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt"
         #Q = expand("results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q", 
         #K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix']),
         #P = expand("results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.{seed}.P", 
