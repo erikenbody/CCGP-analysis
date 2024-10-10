@@ -127,7 +127,7 @@ rule algatr_tess:
         rmislands = "true",
         kvals = "1:10",
         output_path = "results/{refGenome}/algatr/",
-        incl_env = "true"
+        incl_env = "false"
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
     log:
