@@ -56,10 +56,14 @@ output = [
         # expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
-        #expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/pop_analysis/{prefix}_admixture_final.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # admixture
         expand("results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
-        expand("results/{refGenome}/algatr/{prefix}_admixture_composite.pdf", refGenome = config['refgenome'], prefix=config['final_prefix'])
+        expand("results/{refGenome}/algatr/{prefix}_admixture_composite.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
+
+        #not using eval admix, although it is implemented
+        #expand("results/{refGenome}/algatr/admixture/evaladmix/{prefix}_complete.txt", refGenome = config['refgenome'], prefix=config['final_prefix'])
 
 
         
@@ -75,14 +79,14 @@ rule all:
     input: output
 
 include: "ccgp/Snakefile"
-#nclude: "reference/Snakefile"
+#include: "reference/Snakefile"
 include: "local_pca/Snakefile"
 include: "alagtr/Snakefile"
 include: "pop_analysis/Snakefile"
 #include: "../ccgp_feems/Snakefile" #need to get envs set up for this to work
 
-# if config['bed']:
-#    include: "postprocess/Snakefile"
-#    include: "trackhub/Snakefile" 
-# else:
-#    include: "postprocess_variant/Snakefile"
+if config['bed']:
+   include: "postprocess/Snakefile"
+   include: "trackhub/Snakefile" 
+else:
+   include: "postprocess_variant/Snakefile"

@@ -1,3 +1,32 @@
+        
+def get_k(wc):
+    pops = checkpoints.distinguish_populations.get(**wc).output[1]
+
+    k_values = []
+    
+    pops_dir = Path(pops)
+    
+    if pops_dir.is_dir():
+        
+        files = [file.name for file in pops_dir.iterdir() if file.is_file()]
+        k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
+        seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
+    out = [
+        *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
+
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
+        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz", **wc, k=k_values, seed = seeds),
+    ]
+    
+    return out
+
+rule pop_get_k_files:
+    # dummy rule to get all of the files split by k pops
+    input: get_k
+    output: touch("results/{refGenome}/pop_analysis/{prefix}_k.done")
+
 rule get_GONE_contigs:
     input:
         #renamed = "results/{refGenome}/algatr/{prefix}_chromosome_names.txt",
@@ -16,37 +45,6 @@ rule get_GONE_contigs:
         """
         awk '{{print $2, $1}}' {input.fai} 2> {log} | sort -k1,1nr 2>> {log} | head -n {params.chrom_num} 2>> {log} | awk '{{print $2}}' > {output.chrom_names} || true
         """
-        
-
-def get_k(wc):
-    pops = checkpoints.distinguish_populations.get(**wc).output[1]
-
-    k_values = []
-    
-    pops_dir = Path(pops)
-    
-    if pops_dir.is_dir():
-        
-        files = [file.name for file in pops_dir.iterdir() if file.is_file()]
-        k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
-        seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
-    out = [
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi", **wc, k=k_values),
-        *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
-
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.roh.gz", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh", **wc, k=k_values),
-        *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
-
-        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
-        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz", **wc, k=k_values, seed = seeds),
-        
-    ]
-    
-    return out
 
 checkpoint distinguish_populations:
     input:
@@ -67,8 +65,8 @@ checkpoint distinguish_populations:
         admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}",
         manual_k_assignment = config['manual_k_assignment'],
         project_id = "{prefix}",
-        threshold_qval = 0.80,
-        method = "admixture"
+        threshold_qval = config['qvalue_threshold'],
+        method = config["method"]
     script:
         "scripts/final_admixture_plot.R"
 
@@ -321,13 +319,6 @@ rule pop_plot_all_seeds:
         seeds = list(range(1, 11))
     script:
         "scripts/plot_GONE_all_seeds.py"
-
-rule pop_get_k_files:
-    # dummy rule to get all of the files split by k pops
-    input: get_k
-    output: touch("results/{refGenome}/pop_analysis/{prefix}_k.done")
-
-
 
 ###### ROH AND PI RULES####################
 
