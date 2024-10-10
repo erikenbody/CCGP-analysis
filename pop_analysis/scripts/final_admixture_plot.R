@@ -87,7 +87,7 @@ create_plots_tess <- function(coords_file, tess_file, fam, set_k, output_path) {
     geom_polygon(data = california_map, aes(x = long, y = lat, group = group), fill = "white", color = "black") +
     geom_scatterpie(data = wide_data, aes(x = Longitude, y = Latitude), cols = kvals, color = NA) +
     coord_fixed() +
-    labs(title = "TESS Admixture Proportions", x = NULL, y = NULL) +
+    labs(title = "TESS Admixture Proportions", x = NULL, y = NULL, fill = "pop") +
     theme_minimal() +
     theme(legend.position = c(0.8, 0.8)) +
     scale_fill_manual(values = selected_colors)
@@ -218,7 +218,7 @@ create_plots_admixture <- function(coords_file, admixture_path,fam, set_k, outpu
     geom_polygon(data = california_map, aes(x = long, y = lat, group = group), fill = "white", color = "black") +
     geom_scatterpie(data = admixture_data, aes(x = Longitude, y = Latitude), cols = k_columns, color = NA) +
     coord_fixed() +
-    labs(title = "Admixture Proportions", x = NULL, y = NULL) +
+    labs(title = "Admixture Proportions", x = NULL, y = NULL, fill = "pop") +
     theme_minimal() +
     theme(legend.position = c(0.8, 0.8)) +
     scale_fill_manual(values = selected_colors)
