@@ -120,7 +120,7 @@ peakRAM_tess <-
 
 # Krige Q values ----------------------------------------------------------
 
-if (!is.null(incl_env)) {
+if (!is.null(incl_env) & length(kvals) > 1) {
   grid <- raster::aggregate(dat$envlayers[[1]], fact = 6)
   reproj <- reproject(coords = dat$coords, env = grid)
   
@@ -155,6 +155,13 @@ export_TESS <- function(dat, results) {
     readr::write_csv(qvals,
                      file = paste0(output_path, species, "_TESS_qmatrix.csv"),
                      col_names = TRUE)
+
+    # Export raster of kriged Q values
+    if (!is.null(incl_env)) {
+      terra::writeRaster(krig_admix,
+                         paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
+                         overwrite = TRUE)
+   }
   }
   
   if (length(kvals) == 1) {
@@ -163,14 +170,7 @@ export_TESS <- function(dat, results) {
                      file = paste0(output_path, species, "_TESS_qmatrix.csv"),
                      col_names = TRUE)
   }
-  
-  # Export raster of kriged Q values
-  if (!is.null(incl_env)) {
-    terra::writeRaster(krig_admix,
-                       paste0(output_path, species, "_TESS_bestK_krigadmix.tif"),
-                       overwrite = TRUE)
-  }
-  
+
   # Export cross-entropy values for all K values
   x <- results$tess3_obj
   
@@ -230,7 +230,7 @@ peakRAM_exp <-
 
 # Export RAM usage --------------------------------------------------------
 
-if (!is.null(incl_env)) {
+if (!is.null(incl_env) & length(kvals) > 1) {
   RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
                           as.data.frame(peakRAM_dos),
                           as.data.frame(peakRAM_tess),
@@ -239,7 +239,7 @@ if (!is.null(incl_env)) {
     dplyr::mutate(fxn = c("import", "dosage", "run", "krig", "export"))
 }
 
-if (is.null(incl_env)) {
+if (is.null(incl_env) & length(kvals) == 1) {
   RAM <- dplyr::bind_rows(as.data.frame(peakRAM_imp),
                           as.data.frame(peakRAM_dos),
                           as.data.frame(peakRAM_tess),
