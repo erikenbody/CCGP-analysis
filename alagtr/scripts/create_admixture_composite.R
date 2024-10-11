@@ -140,7 +140,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   results_list <- list()
   renamed_list <- list() 
   # Iterate over i from 1 to 10
-  for (i in 2:10) {
+  for (i in 1:10) {
     # Filter and select relevant columns
     df_smaller <- df_comp %>%
       select(-Longitude, -Latitude) %>%
@@ -153,6 +153,10 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     
     # Calculate the correlation matrix
     cor_matrix <- cor(k_x, k_y)
+    if(i == 1){
+      cor_matrix[1] <- 1
+    }
+
     print(paste("Correlation matrix for K_value =", i))
     print(cor_matrix)
     
@@ -428,3 +432,11 @@ combined_plot <- create_plots(
 #   admixture_path = "data/super_secret_structure_project/Q_files/41-Cyanocitta",
 #   output_path = "data/super_secret_structure_project/test_output.pdf"
 # )
+
+# coords_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.coords.txt"
+# tess_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga_TESS_qmatrix.csv"
+# xval_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga_TESS_xval.csv"
+# cv_errors_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/admixture/logs/5-Mirounga_best_K.txt"
+# eigenvec_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.eigenvec"
+# eigenval_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.eigenval"
+# admixture_path = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/admixture/Q_files/5-Mirounga"
