@@ -87,12 +87,36 @@ rule algatr_remove_samps_no_coords_full:
         fi
         """
 
+rule algatr_remove_samps_no_coords_ld06:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+    output:
+        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+        vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
+    conda:
+        "envs/bcftools.yml"
+    shell:
+        """
+        bcftools index {input.vcf}
+        if [ ! -s {input.excluded_samps} ]; then
+            cp {input.vcf} {output.filtered_no_coords}
+            cp {output.vcfidx} {output.filtidx_no_coords}
+        else
+            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+            bcftools index {output.filtered_no_coords}
+        fi
+        """
+
 rule algatr_plink_pca:
     """
     Call plink PCA. Needed for input to RDA analysis
     """
     input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
     params:
         prefix = "results/{refGenome}/algatr/{prefix}"
     output: 
@@ -112,15 +136,11 @@ rule algatr_tess:
     call algatr tess 
     """
     input:
-        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
-        #pruned = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #this doesnt have samples with coordinates removed included
-        pruned = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",#vcf with samples with missing coordinates removed
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
-        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
-        #coords = "results/{refGenome}/QC/{prefix}.coords.txt",
-        coords2 = "results/{refGenome}/algatr/{prefix}.coords.txt" #this should exist when it is made
+        vcf_idx = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+        coords2 = "results/{refGenome}/algatr/{prefix}.coords.txt" 
     params:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
@@ -171,9 +191,7 @@ rule algatr_generate_index:
 
 rule algatr_separate_vcf:
     input:
-        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
-        #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
         csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
     output:
@@ -185,15 +203,33 @@ rule algatr_separate_vcf:
     shell:
          "bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}"
 
+rule algatr_separate_vcf_ld06:
+    input:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi"
+    output:
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz"
+    conda:
+        "envs/bcftools.yml"
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}_pruned.scaff.txt"
+    shell:
+         """
+         bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}
+         """
+
+
 rule algatr_RDA:
     """
-    call algatr tess 
+    call algatr RDA 
     """
     input:
         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
-        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+        #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
     params:
@@ -244,7 +280,9 @@ rule algatr_RDA_pruned:
         #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
-        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+        #prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+        #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
     params:

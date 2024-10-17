@@ -9,7 +9,11 @@ suppressMessages({
   library(algatr)
 })
 
-# example call: `Rscript RDA_cloud.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" "outputs/RDA/" FALSE FALSE "structure" 1:5 FALSE FALSE 3 "best" 0.01 3 0.05 1000 TRUE "fdr"`
+# # example call: `Rscript RDA_cloud.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" "outputs/RDA/" FALSE FALSE "structure" 1:5 FALSE FALSE 3 "best" 0.01 3 0.05 1000 TRUE "fdr"`
+# if (!require("algatr", character.only = TRUE)) {
+#   # Install the package if not installed
+#   devtools::install_github("TheWangLab/algatr", quiet = T)
+# }
 
 #set up log file writing
 log_smk <- function() {
@@ -51,7 +55,6 @@ kvals <- try(eval(parse(text = kvals)), silent = TRUE)
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
 # Import and process data -------------------------------------------------
-
 peakRAM_imp <-
   peakRAM::peakRAM(
     dat <- get_input_objects(species = species, 
@@ -63,14 +66,18 @@ peakRAM_imp <-
                              rmislands = rmislands,
                              save_impute = FALSE, # save this for later
                              intervals = intervals,
-                             scaff = scaff) 
+                             scaff = scaff,
+                             vcf_path = snakemake@input[["vcf"]])
+
   )
+print("got here 1")
 
 # Extract and standardize environmental variables and make into dataframe
 env <- raster::extract(dat$envlayers, dat$coords)
 env <- scale(env, center = TRUE, scale = TRUE)
 env <- data.frame(env)
-
+print(env)
+print("got here 2")
 
 # Run RDA -----------------------------------------------------------------
 
@@ -185,7 +192,7 @@ peakRAM_run <-
                       R2permutations = R2permutations, 
                       R2scope = R2scope)
   )
-
+print("got here 3")
 
 # Get outliers and run cortest --------------------------------------------
 
@@ -325,9 +332,9 @@ export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_imput
   }
   
   # Build and save Manhattan plot to file
-  plt_manhat <- manhat_plot(mod, outliers)
-  plt_manhat
-  ggsave(paste0(output_path, species, "_manhatplot.png"), width = 8, height = 4.5, bg = "white")
+  #plt_manhat <- manhat_plot(mod, outliers)
+  #plt_manhat
+  #ggsave(paste0(output_path, species, "_manhatplot.png"), width = 8, height = 4.5, bg = "white")
 }
 
 # Export results

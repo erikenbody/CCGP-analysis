@@ -19,7 +19,8 @@
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
 #' NOTE: requires a common dir containing env files. Within that dir, must contain "PC_layers" and "CA_State" dirs
-get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE) {
+get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", 
+  kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE, vcf_path) {
   
   # Get coords --------------------------------------------------------------
 
@@ -28,7 +29,6 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   coords$x <- as.numeric(coords$x)
   coords$y <- as.numeric(coords$y)
 
-  print(coords)
   # Get input data ----------------------------------------------------------
   if (analysis == "gendist") {
     if (!pruned) {
@@ -44,21 +44,24 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   }
   
   if (analysis == "vcf") {
-    if (!pruned) {
-      if (!intervals){
-        gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
-      }
-      if (intervals){
-        gen <- vcfR::read.vcfR(paste0(data_path, "algatr/subsets/", species, "_", scaff, "_annotated.vcf.gz"))
-      }
-    }
-    if (pruned) {
-      #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
-      #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.vcf.gz"))
-      #use this to test out, much smaller file
-      #gen <- vcfR::read.vcfR(paste0(data_path, "QC/", species, ".pruned.vcf.gz"))
-      gen <- vcfR::read.vcfR(paste0(data_path, "algatr/", species, "_complete_coords_pruned_mil.vcf.gz"))
-    }
+      gen <- vcfR::read.vcfR(vcf_path)
+
+    # if (!pruned) {
+    #   if (!intervals){
+    #     gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
+    #   }
+    #   if (intervals){
+    #     #gen <- vcfR::read.vcfR(paste0(data_path, "algatr/subsets/", species, "_", scaff, "_annotated.vcf.gz"))
+    #     gen <- vcfR::read.vcfR(paste0(data_path, "algatr/subsets/", species, "_", scaff, "_annotated_pruned_0.6.vcf.gz"))
+    #   }
+    # }
+    # if (pruned) {
+    #   #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
+    #   #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.vcf.gz"))
+    #   #use this to test out, much smaller file
+    #   #gen <- vcfR::read.vcfR(paste0(data_path, "QC/", species, ".pruned.vcf.gz"))
+    #   gen <- vcfR::read.vcfR(paste0(data_path, "algatr/", species, "_complete_coords_pruned_0.6.vcf.gz"))
+    # }
     if (impute == "simple") {
       gen <- algatr::vcf_to_dosage(gen)
       gen <- algatr::simple_impute(x = gen, FUN = median)
