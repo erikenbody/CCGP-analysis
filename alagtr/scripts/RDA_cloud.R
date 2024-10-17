@@ -121,10 +121,10 @@ rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FAL
         dplyr::select(tidyselect::all_of(1:nPC))
       pc <- pc[complete.cases(env), ]
     }
-    # NOTE: this must be last
-    env <- env[complete.cases(env), ]
   }
-  
+  # NOTE: this must come after above lines
+  if (any(is.na(env))) env <- env[complete.cases(env), ]
+
   # Set up model ---------------------------------------------------------
   if (is.null(correctPC) & is.null(correctGEO)) {
     moddf <- data.frame(env)
@@ -321,9 +321,6 @@ export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_imput
                     outlier_helper(cor_df_z, outlier = "z"))
   readr::write_csv(cor_test, file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
                    col_names = TRUE)
-  
-  # RDA model
-  saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
   
   # Save imputed data
   if (save_impute) {
