@@ -113,17 +113,18 @@ rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FAL
   
   if (any(is.na(env))) {
     warning("Missing values found in env data, removing rows with NAs")
-    gen <- gen[complete.cases(env), ]
-    if (!is.null(coords)) coords <- coords[complete.cases(env), ]
+    na_env <- env
+    gen <- gen[complete.cases(na_env), ]
+    if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
     if (!is.null(correctPC)) {
       pc <- read_tsv(paste0(correctPC)) %>% 
         tibble::column_to_rownames(var = "#IID") %>% 
         dplyr::select(tidyselect::all_of(1:nPC))
-      pc <- pc[complete.cases(env), ]
+      pc <- pc[complete.cases(na_env), ]
     }
+    # Must come last
+    env <- env[complete.cases(na_env), ]
   }
-  # NOTE: this must come after above lines
-  if (any(is.na(env))) env <- env[complete.cases(env), ]
 
   # Set up model ---------------------------------------------------------
   if (is.null(correctPC) & is.null(correctGEO)) {
