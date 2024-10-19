@@ -106,6 +106,11 @@ rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FAL
     warning("env names should differ from x and y. Appending 'env' to env names")
   }
   
+  # Read in PCs
+  pc <- readr::read_tsv(paste0(correctPC)) %>%
+          tibble::column_to_rownames(var = "#IID") %>% 
+          dplyr::select(tidyselect::all_of(1:nPC))
+
   # Handle NA values -----------------------------------------------------
   if (any(is.na(gen))) {
     stop("Missing values found in gen data")
@@ -115,68 +120,26 @@ rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FAL
     warning("Missing values found in env data, removing rows with NAs")
     na_env <- env
     gen <- gen[complete.cases(na_env), ]
-    if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
-    if (!is.null(correctPC)) {
-      pc <- read_tsv(paste0(correctPC)) %>% 
-        tibble::column_to_rownames(var = "#IID") %>% 
-        dplyr::select(tidyselect::all_of(1:nPC))
-      pc <- pc[complete.cases(na_env), ]
-    }
+    pc <- pc[complete.cases(na_env), ]
     # Must come last
     env <- env[complete.cases(na_env), ]
+    if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
   }
 
-  # Set up model ---------------------------------------------------------
-  if (is.null(correctPC) & is.null(correctGEO)) {
-    moddf <- data.frame(env)
-    f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+")))
+  # Set up model ------------------------------------------------------------
+  # Check env var naming ----------------------------------------------------
+  if(any(colnames(pc) %in% colnames(env))) {
+    colnames(env) <- paste(colnames(env), "_env", sep = "")
+    warning("env names should differ from PC1, PC2, etc if correctPC is TRUE. Appending 'env' to env names")
   }
-  
-  if (!is.null(correctPC) & is.null(correctGEO)) {
-    # Check env var naming ----------------------------------------------------
-    if(any(colnames(pc) %in% colnames(env))) {
-      colnames(env) <- paste(colnames(env), "_env", sep = "")
-      warning("env names should differ from PC1, PC2, etc if correctPC is TRUE. Appending 'env' to env names")
-    }
-    moddf <- data.frame(env, pc)
-    f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
-  }
-  
-  if (!is.null(correctPC) & !is.null(correctGEO)) {
-    if (is.null(coords)) stop("Coordinates must be provided if correctGEO is TRUE")
-    pc <- read_tsv(paste0(correctPC)) %>% 
-      tibble::column_to_rownames(var = "#IID") %>% 
-      dplyr::select(tidyselect::all_of(1:nPC))
+  print(paste0("env object has ", nrow(env), " rows"))
+  print(paste0("pc object has ", nrow(pc), " rows"))
+  print(paste0("gen object has ", nrow(gen), " rows"))
 
-    # Check env var naming ----------------------------------------------------
-    if(any(colnames(pc) %in% colnames(env))) {
-      colnames(env) <- paste(colnames(env), "_env", sep = "")
-      warning("Enviro var names should differ from PC1, PC2, etc if correctPC is TRUE. Appending env to enviro var names")
-    }
+  moddf <- data.frame(env, pc)
+  f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
 
-    moddf <- data.frame(env, coords, pc)
-    f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), "+ x + y)"))
-  }
-  
-  if (is.null(correctPC) & !is.null(correctGEO)) {
-    if (is.null(coords)) stop("Coordinates must be provided if correctGEO is TRUE")
-    
-    moddf <- data.frame(env, coords)
-    f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(x + y)"))
-  }
-  
-  if (model == "best") {
-    mod_full <- vegan::rda(f, data = moddf)
-    mod_null <- vegan::rda(gen ~ 1, data = moddf)
-    mod <- vegan::ordiR2step(mod_null, mod_full, Pin = Pin, R2permutations = R2permutations, R2scope = R2scope)
-    if (mod$call == mod_null$call) {
-      mod <- mod_full
-      warning("Best model is NULL model, returning full model instead")
-    }
-  } else {
-    mod <- vegan::rda(f, data = moddf)
-  }
-  
+  mod <- vegan::rda(f, data = moddf)
   return(list(gen = gen, mod = mod, env = env))
 }
 
@@ -194,6 +157,7 @@ peakRAM_run <-
                       R2scope = R2scope)
   )
 print("got here 3")
+
 
 # Get outliers and run cortest --------------------------------------------
 
