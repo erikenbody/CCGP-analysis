@@ -270,16 +270,20 @@ export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_imput
   saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
   
   # Sig results Z-scores
-  readr::write_csv(rda_sig_z,
-                   file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
-                   col_names = TRUE)
+  if (!is.null(rda_sig_z)) {
+    readr::write_csv(rda_sig_z,
+      file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
+      col_names = TRUE)
+  }
   
   # Sig results p-values
-  snps <- rda_sig_p$rdadapt %>% 
+  if (!is.null(rda_sig_p)) {
+    snps <- rda_sig_p$rdadapt %>% 
     dplyr::mutate(locus = colnames(dat$gen))
-  readr::write_csv(snps,
-                   file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
-                   col_names = TRUE)
+    readr::write_csv(snps,
+      file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
+      col_names = TRUE)
+  }
   
   # Correlation test results
   cor_test <- rbind(outlier_helper(cor_df_p, outlier = "p"),
