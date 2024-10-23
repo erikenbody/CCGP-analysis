@@ -74,6 +74,8 @@ print("got here 1")
 
 # Extract and standardize environmental variables and make into dataframe
 env <- raster::extract(dat$envlayers, dat$coords)
+print(dat$coords)
+print(dat$envlayers)
 env <- scale(env, center = TRUE, scale = TRUE)
 env <- data.frame(env)
 print(env)
@@ -260,6 +262,14 @@ manhat_plot <- function(mod, outliers) {
   return(plt_manhat)
 }
 
+# explict ouputs
+rda_output = snakemake@output[["rda_output"]]
+zscore_output = snakemake@output[["zscore_output"]]
+rdadapt_output = snakemake@output[["rdadapt_output"]]
+cortest_output = snakemake@output[["cortest_output"]]
+imputed_output = snakemake@output[["imputed_output"]]
+peakram_output = snakemake@output[["peakram_output"]]
+#manhat_output = snakemake@output[["manhat_output"]]
 
 # Export results ----------------------------------------------------------
 
@@ -267,36 +277,44 @@ export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_imput
   outlier_helper <- function(df, outlier) {dat <- df %>% dplyr::mutate(outlier_method = outlier)}
   
   # RDA model results
-  saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
+  #saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
+  saveRDS(mod, file = rda_output)
   
   # Sig results Z-scores
   readr::write_csv(rda_sig_z,
-                   file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
+                   #file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
+                   file = zscore_output,
                    col_names = TRUE)
   
   # Sig results p-values
   snps <- rda_sig_p$rdadapt %>% 
     dplyr::mutate(locus = colnames(dat$gen))
   readr::write_csv(snps,
-                   file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
+                   #file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
+                   file = rdadapt_output,
                    col_names = TRUE)
   
   # Correlation test results
   cor_test <- rbind(outlier_helper(cor_df_p, outlier = "p"),
                     outlier_helper(cor_df_z, outlier = "z"))
-  readr::write_csv(cor_test, file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
+  readr::write_csv(cor_test, 
+                   #file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
+                   file = cortest_output,
                    col_names = TRUE)
   
   # Save imputed data
   if (save_impute) {
-    write.table(dat$gen, file = paste0(output_path, species, "_imputed_", impute, ".txt"),
+    write.table(dat$gen, 
+                #file = paste0(output_path, species, "_imputed_", impute, ".txt"),
+                file = imputed_output,
                 sep = " ", row.names = FALSE, col.names = TRUE, quote = FALSE)
   }
   
   # Build and save Manhattan plot to file
   #plt_manhat <- manhat_plot(mod, outliers)
   #plt_manhat
-  #ggsave(paste0(output_path, species, "_manhatplot.png"), width = 8, height = 4.5, bg = "white")
+  ##ggsave(paste0(output_path, species, "_manhatplot.png"), width = 8, height = 4.5, bg = "white")
+  #ggsave(manhat_output, width = 8, height = 4.5, bg = "white")
 }
 
 # Export results
@@ -316,4 +334,5 @@ RAM <- dplyr::bind_rows(peakRAM_imp,
   dplyr::mutate(fxn = c("import", "run", "outliers", "cortest", "export"))
 
 readr::write_csv(RAM,
-                 file = paste0(output_path, species, "_RDA_peakRAM.csv"))
+                 #file = paste0(output_path, species, "_RDA_peakRAM.csv"),
+                 file = peakram_output)

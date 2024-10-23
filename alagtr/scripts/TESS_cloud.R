@@ -69,8 +69,6 @@ kvals <- try(eval(parse(text = kvals)), silent = TRUE)
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
 # Import and process data -------------------------------------------------
-print(snakemake@input[[1]])
-print(snakemake@input[["vcf"]])
 peakRAM_imp <-
   peakRAM::peakRAM(
     dat <- get_input_objects(species = species, 
