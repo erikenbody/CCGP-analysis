@@ -55,6 +55,7 @@ kvals <- try(eval(parse(text = kvals)), silent = TRUE)
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
 # Import and process data -------------------------------------------------
+# TODO add multispecies arg to get_input_objects
 peakRAM_imp <-
   peakRAM::peakRAM(
     dat <- get_input_objects(species = species, 
