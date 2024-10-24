@@ -45,10 +45,13 @@ output = [
         
         # RDA output:
         #expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
-        expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+        expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt", refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
    
         # RDA LD pruned output:
-         
+        
+        # LFMM output:
+        expand("results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_LFMM_pvalues.csv", refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+
         # # GONE stuff.
        
         # expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),

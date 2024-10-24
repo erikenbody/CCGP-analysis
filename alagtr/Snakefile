@@ -219,7 +219,6 @@ rule algatr_separate_vcf_ld06:
          bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}
          """
 
-
 rule algatr_RDA:
     """
     call algatr RDA 
@@ -274,7 +273,7 @@ rule algatr_RDA:
 
 rule algatr_RDA_pruned:
     """
-    call algatr tess on a pruned dataset
+    call algatr RDA on a pruned dataset
     """
     input:
         #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
@@ -324,6 +323,52 @@ rule algatr_RDA_pruned:
         "envs/algatr.yml"
     script:
         "scripts/RDA_cloud.R"
+
+rule algatr_LFMM_pruned:
+    """
+    call algatr LFMM on a pruned dataset
+    """
+    input:
+        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+        env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+        #prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+        #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+        coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        output_path = "results/{refGenome}/algatr/",
+        rmislands = "false",
+        pruned = "true",
+        impute = "simple",
+        lfmm_method = "ridge",
+        manual_k_assignment = config['manual_k_assignment'], # TODO K value from admixture/TESS
+        sig = 0.05,
+        p_adj = "fdr",
+        intervals = "false",
+        scaff = "NA",
+        color_by_contig = "false"
+
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        log = "logs/{refGenome}/algatr/{prefix}.LFMM.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/{prefix}.LFMM.benchmark.txt",
+    output: 
+        # impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
+        # impute = "results/{refGenome}/algatr/{prefix}_imputed_simple.txt", 
+        # model = "results/{refGenome}/subsets/LFMM/{scaff}/{prefix}_LFMM_model.RDS", # TODO how to specify manual_k_assignment?
+        # assoc_test = "results/{refGenome}/subsets/LFMM/{scaff}/{prefix}_LFMM_assoctest.RDS", # TODO how to specify manual_k_assignment?
+        pvalues = "results/{refGenome}/subsets/LFMM/{scaff}/{prefix}_LFMM_pvalues.csv", # TODO how to specify manual_k_assignment?
+        # manhat = "results/{refGenome}/subsets/LFMM/{scaff}/{prefix}_LFMM_manhatplot.png", # TODO how to specify manual_k_assignment?
+        # peakRAM = "results/{refGenome}/subsets/LFMM/{scaff}/{prefix}_LFMM_peakRAM.csv", # TODO how to specify manual_k_assignment?
+    conda:
+        "envs/algatr.yml"
+    script:
+        "scripts/LFMM_cloud.R"
 
 # rule shapeit:
 #     input:
