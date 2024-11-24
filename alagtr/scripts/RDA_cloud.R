@@ -262,14 +262,27 @@ manhat_plot <- function(mod, outliers) {
   return(plt_manhat)
 }
 
-# explict ouputs
-rda_output = snakemake@output[["rda_output"]]
+# explicit ouputs
+#rda_output = snakemake@output[["rda_output"]]
 zscore_output = snakemake@output[["zscore_output"]]
 rdadapt_output = snakemake@output[["rdadapt_output"]]
 cortest_output = snakemake@output[["cortest_output"]]
 imputed_output = snakemake@output[["imputed_output"]]
 peakram_output = snakemake@output[["peakram_output"]]
 #manhat_output = snakemake@output[["manhat_output"]]
+colsum_output = snakemake@output[["colsum_output"]]
+ybar_output = snakemake@output[["ybar_output"]]
+v_output = snakemake@output[["v_output"]]
+u_output = snakemake@output[["u_output"]]
+wa_output = snakemake@output[["wa_output"]]
+qr_output = snakemake@output[["qr_output"]]
+eig_output = snakemake@output[["eig_output"]]
+biplot_output = snakemake@output[["biplot_output"]]
+qraux_output = snakemake@output[["qraux_output"]]
+envcentre_output = snakemake@output[["envcentre_output"]]
+chi_output = snakemake@output[["chi_output"]]
+scalload_output = snakemake@output[["scalload_output"]]
+unscalload_output = snakemake@output[["unscalload_output"]]
 
 # Export results ----------------------------------------------------------
 
@@ -278,8 +291,25 @@ export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_imput
   
   # RDA model results
   #saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
-  saveRDS(mod, file = rda_output)
-  
+  #saveRDS(mod, file = rda_output)
+  # Export raw values from RDA model result
+  data.frame(mod$colsum) %>% rownames_to_column(var = "locus") %>% write_csv(file = colsum_output, col_names = TRUE)
+  data.frame(mod$Ybar) %>% rownames_to_column(var = "INDV") %>% write_csv(file = ybar_output, col_names = TRUE)
+  data.frame(mod$CCA$v) %>% rownames_to_column(var = "locus") %>% write_csv(file = v_output, col_names = TRUE)
+  data.frame(mod$CCA$u) %>% rownames_to_column(var = "INDV") %>% write_csv(file = u_output, col_names = TRUE)
+  data.frame(mod$CCA$wa) %>% rownames_to_column(var = "INDV") %>% write_csv(file = wa_output, col_names = TRUE)
+  data.frame(mod$CCA$QR$qr) %>% write_csv(file = qr_output, col_names = TRUE)
+  data.frame(mod$CCA$eig) %>% rownames_to_column(var = "RDA") %>% write_csv(file = eig_output, col_names = TRUE)
+  data.frame(mod$CCA$biplot) %>% rownames_to_column(var = "var") %>% write_csv(file = biplot_output, col_names = TRUE)
+  data.frame(mod$CCA$QR$qraux) %>% write_csv(file = qraux_output, col_names = TRUE)
+  data.frame(mod$CCA$envcentre) %>% tibble::rownames_to_column(var = "axis") %>% write_csv(file = envcentre_output, col_names = TRUE)
+  data.frame(mod_chi = mod$tot.chi,
+            mod_chi_cca = mod$CCA$tot.chi) %>% write_csv(file = chi_output, col_names = TRUE)
+
+# Export scores (scaled and unscaled); labeled "species" corresponds to v, "sites" corresponds to wa, and "constraints" corresponds to u
+scaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE) %>% write_csv(file = scalload_output, col_names = TRUE)
+unscaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE, scaling = 0) %>% write_csv(file = unscalload_output, col_names = TRUE)
+
   # Sig results Z-scores
   readr::write_csv(rda_sig_z,
                    #file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
