@@ -9,7 +9,7 @@ def get_scaffolds(fai):
         for line in fai_file:
             scaffold = line.split('\t')[0]
             length = line.split('\t')[1]
-            if int(length) >= 500000:
+            if int(length) >= 2000000:
                 scaffolds.append(scaffold)
     return scaffolds
 
@@ -45,7 +45,7 @@ output = [
         
         # RDA output:
         #expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
-        expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+        #expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
    
         # RDA LD pruned output:
          
@@ -86,8 +86,8 @@ include: "alagtr/Snakefile"
 include: "pop_analysis/Snakefile"
 #include: "../ccgp_feems/Snakefile" #need to get envs set up for this to work
 
-# if config['bed']:
-#    include: "postprocess/Snakefile"
-#    include: "trackhub/Snakefile" 
-# else:
-#    include: "postprocess_variant/Snakefile"
+if config['bed']:
+   #include: "postprocess/Snakefile"
+   include: "trackhub/Snakefile" 
+else:
+   include: "postprocess_variant/Snakefile"
