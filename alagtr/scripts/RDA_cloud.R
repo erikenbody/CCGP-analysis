@@ -260,32 +260,75 @@ manhat_plot <- function(mod, outliers) {
   return(plt_manhat)
 }
 
+# Uncomment below for explicit ouputs
+# zscore_output = snakemake@output[["zscore_output"]]
+# rdadapt_output = snakemake@output[["rdadapt_output"]]
+# cortest_output = snakemake@output[["cortest_output"]]
+# imputed_output = snakemake@output[["imputed_output"]]
+# peakram_output = snakemake@output[["peakram_output"]]
+# colsum_output = snakemake@output[["colsum_output"]]
+# ybar_output = snakemake@output[["ybar_output"]]
+# v_output = snakemake@output[["v_output"]]
+# u_output = snakemake@output[["u_output"]]
+# wa_output = snakemake@output[["wa_output"]]
+# qr_output = snakemake@output[["qr_output"]]
+# eig_output = snakemake@output[["eig_output"]]
+# biplot_output = snakemake@output[["biplot_output"]]
+# qraux_output = snakemake@output[["qraux_output"]]
+# envcentre_output = snakemake@output[["envcentre_output"]]
+# chi_output = snakemake@output[["chi_output"]]
+# scalload_output = snakemake@output[["scalload_output"]]
+# unscalload_output = snakemake@output[["unscalload_output"]]
 
 # Export results ----------------------------------------------------------
 
 export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_impute) {
   outlier_helper <- function(df, outlier) {dat <- df %>% dplyr::mutate(outlier_method = outlier)}
   
-  # RDA model results
+  # RDA model results; I've commented out the explicit paths
   #saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
   data.frame(mod$colsum) %>% 
     tibble::rownames_to_column(var = "locus") %>% 
-    readr::write_csv(file = paste0(output_path, species, "_RDA_colsums.csv"), 
-                     col_names = TRUE)
-  data.frame(mod$Ybar) %>% tibble::rownames_to_column(var = "INDV") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_Ybar.csv"), col_names = TRUE)
-  data.frame(mod$CCA$v) %>% tibble::rownames_to_column(var = "locus") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_v.csv"), col_names = TRUE)
-  data.frame(mod$CCA$u) %>% tibble::rownames_to_column(var = "INDV") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_u.csv"), col_names = TRUE)
-  data.frame(mod$CCA$wa) %>% tibble::rownames_to_column(var = "INDV") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_wa.csv"), col_names = TRUE)
-  data.frame(mod$CCA$QR$qr) %>% readr::write_csv(file = paste0(output_path, species, "_RDA_qr.csv"), col_names = TRUE)
-  data.frame(mod$CCA$eig) %>% tibble::rownames_to_column(var = "RDA") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_eig.csv"), col_names = TRUE)
-  data.frame(mod$CCA$biplot) %>% tibble::rownames_to_column(var = "var") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_biplot.csv"), col_names = TRUE)
-  data.frame(mod$CCA$QR$qraux) %>% readr::write_csv(file = paste0(output_path, species, "_RDA_qraux.csv"), col_names = TRUE)
-  data.frame(mod$CCA$envcentre) %>% tibble::rownames_to_column(var = "axis") %>% readr::write_csv(file = paste0(output_path, species, "_RDA_envcentre.csv"), col_names = TRUE)
-  data.frame(mod_chi = mod$tot.chi, mod_chi_cca = mod$CCA$tot.chi) %>% readr::write_csv(file = paste0(output_path, species, "_RDA_totchi.csv"), col_names = TRUE)
+    # readr::write_csv(file = colsum_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_colsums.csv"), col_names = TRUE)
+  data.frame(mod$Ybar) %>% tibble::rownames_to_column(var = "INDV") %>% 
+    # readr::write_csv(file = ybar_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_Ybar.csv"), col_names = TRUE)
+  data.frame(mod$CCA$v) %>% tibble::rownames_to_column(var = "locus") %>% 
+    # readr::write_csv(file = v_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_v.csv"), col_names = TRUE)
+  data.frame(mod$CCA$u) %>% tibble::rownames_to_column(var = "INDV") %>% 
+    # readr::write_csv(file = u_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_u.csv"), col_names = TRUE)
+  data.frame(mod$CCA$wa) %>% tibble::rownames_to_column(var = "INDV") %>% 
+    # readr::write_csv(file = wa_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_wa.csv"), col_names = TRUE)
+  data.frame(mod$CCA$QR$qr) %>% 
+    # readr::write_csv(file = qr_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_qr.csv"), col_names = TRUE)
+  data.frame(mod$CCA$eig) %>% tibble::rownames_to_column(var = "RDA") %>% 
+    # readr::write_csv(file = eig_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_eig.csv"), col_names = TRUE)
+  data.frame(mod$CCA$biplot) %>% tibble::rownames_to_column(var = "var") %>% 
+    # readr::write_csv(file = biplot_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_biplot.csv"), col_names = TRUE)
+  data.frame(mod$CCA$QR$qraux) %>% 
+    # readr::write_csv(file = qraux_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_qraux.csv"), col_names = TRUE)
+  data.frame(mod$CCA$envcentre) %>% tibble::rownames_to_column(var = "axis") %>% 
+    # readr::write_csv(file = envcentre_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_envcentre.csv"), col_names = TRUE)
+  data.frame(mod_chi = mod$tot.chi, mod_chi_cca = mod$CCA$tot.chi) %>% 
+    # readr::write_csv(file = chi_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_totchi.csv"), col_names = TRUE)
 
-# Export scores (scaled and unscaled); labeled "species" corresponds to v, "sites" corresponds to wa, and "constraints" corresponds to u
-scaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE) %>% readr::write_csv(file = paste0(output_path, species, "_RDA_scaledloadings.csv"), col_names = TRUE)
-unscaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE, scaling = 0) %>% readr::write_csv(file = paste0(output_path, species, "_RDA_unscaledloadings.csv"), col_names = TRUE)
+  # Export scores (scaled and unscaled); labeled "species" corresponds to v, "sites" corresponds to wa, and "constraints" corresponds to u
+  scaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE) %>% 
+    # readr::write_csv(file = scalload_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_scaledloadings.csv"), col_names = TRUE)
+  unscaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE, scaling = 0) %>% 
+    # readr::write_csv(file = unscalload_output, col_names = TRUE)
+    readr::write_csv(file = paste0(output_path, species, "_RDA_unscaledloadings.csv"), col_names = TRUE)
 
   # Sig results Z-scores
   if (!is.null(rda_sig_z)) {
