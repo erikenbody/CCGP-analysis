@@ -267,6 +267,26 @@ rule algatr_RDA:
         #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
         #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
         #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+
+        # For explicit paths, uncomment below:
+        # zscore_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
+        # rdadapt_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
+        # cortest_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
+        # imputed_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
+        # peakram_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+        # colsum_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+        # ybar_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+        # v_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+        # u_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+        # wa_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+        # qr_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+        # eig_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+        # biplot_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+        # qraux_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+        # envcentre_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+        # chi_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+        # scalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+        # unscalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
     conda:
         "envs/algatr.yml"
     script:
