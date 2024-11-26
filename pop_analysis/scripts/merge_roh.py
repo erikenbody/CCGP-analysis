@@ -42,7 +42,7 @@ def merge_rohs(input_file, output_file, gap_size):
 
 def main():
     input_file = snakemake.input["rg"]
-    output_file = snakemake.output["merged_rg"]
+    output_file = snakemake.output["merged_rg_ind"]
     gap_size = snakemake.params["gap_size"]
 
 

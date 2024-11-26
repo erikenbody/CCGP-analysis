@@ -48,7 +48,7 @@ admix_cv <- function(output_path) {
                   kval = as.numeric(kval), 
                   seed = as.numeric(seed)) %>% 
     dplyr::group_by(kval) %>% 
-    dplyr::mutate(min_cv_seed = min(cv)) %>% 
+    dplyr::mutate(min_cv_seed = min(cv, na.rm = T)) %>% #EDE added na.rm = T here. This allows seeds that fail to includes, seems fine though
     dplyr::ungroup()
 
   cv_scores_seeds <- cv_scores %>% 

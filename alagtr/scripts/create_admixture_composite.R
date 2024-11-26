@@ -17,7 +17,7 @@ log_smk <- function() {
 log_smk()
 
 create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file, 
-                         eigenvec_file, eigenval_file, admixture_path, output_path, output_match) {
+                         eigenvec_file, eigenval_file, admixture_path, output_path, output_match, fam) {
   # Load the coordinate data
   coords <- read_tsv(coords_file, col_names = c("Sample", "Longitude", "Latitude"))
   
@@ -47,7 +47,11 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     
     # Find the start of the Fst matrix
     fst_start <- grep("Fst divergences between estimated populations:", lines) + 2
-    
+      # Check if fst_start is valid
+    if (length(fst_start) == 0) {
+      warning(paste("Fst matrix start not found in file:", file))
+      return(NULL)
+    }
     # Extract the matrix data
     fst_data <- lines[fst_start:(fst_start + K - 1)]
     
@@ -89,6 +93,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   
   # Load PCA data
   eigenvec <- read_tsv(eigenvec_file, col_names = FALSE, skip = 1)
+  
   eigenval <- read_tsv(eigenval_file, col_names = FALSE)
   colnames(eigenvec) <- c("Sample", paste0("PC", 1:(ncol(eigenvec) - 1)))
   
@@ -102,12 +107,14 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   
   q_files <- list.files(path = dirname(admixture_path), pattern = "\\.42\\.Q$", full.names = TRUE)
   
+  fam <- read_delim(fam, col_names = FALSE, delim = " ")
+
   # Function to read and process each .Q file
   process_q_file <- function(file) {
     admix_k <- str_extract(file, "\\d+(?=\\.42\\.Q)")
     column_names <- paste0("K", seq_len(as.numeric(admix_k)))
     admixture_data <- read_delim(file, col_names = column_names, delim = " ", show_col_types = FALSE)
-    admixture_data$Sample <- eigenvec$Sample
+    admixture_data$Sample <- fam$X2
     admixture_data <- inner_join(coords, admixture_data, by = "Sample")
     admixture_data$K_value <- as.numeric(admix_k)
     return(admixture_data)
@@ -119,7 +126,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   admixture_data <- read_delim(paste0(admixture_path, ".", admix_best_k, ".42.Q"), 
                                col_names = column_names, 
                                delim = " ")
-  admixture_data$Sample <- eigenvec$Sample
+  admixture_data$Sample <- fam$X2
   admixture_data <- inner_join(coords, admixture_data, by = "Sample")
   #
   # Plot 1: Outline of California with pie plots for each individual
@@ -139,7 +146,7 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
   #calculate correlation coefficients
   results_list <- list()
   renamed_list <- list() 
-  # Iterate over i from 1 to 10
+  # Iterate over i from 2 to 10
   for (i in 1:10) {
     # Filter and select relevant columns
     df_smaller <- df_comp %>%
@@ -151,7 +158,6 @@ create_plots <- function(coords_file, tess_file, xval_file, cv_errors_file,
     k_x <- df_smaller %>% select(starts_with("K") & ends_with(".x"))
     k_y <- df_smaller %>% select(starts_with("K") & ends_with(".y"))
     
-    # Calculate the correlation matrix
     cor_matrix <- cor(k_x, k_y)
     if(i == 1){
       cor_matrix[1] <- 1
@@ -419,7 +425,8 @@ combined_plot <- create_plots(
   eigenval_file = snakemake@input[["eigenval"]],
   admixture_path = snakemake@params[["admixture_path"]],
   output_path = snakemake@output[["out"]],
-  output_match = snakemake@output[["match"]]
+  output_match = snakemake@output[["match"]],
+  fam = snakemake@input[["fam"]]
 )
 
 # combined_plot <- create_plots(
@@ -433,10 +440,11 @@ combined_plot <- create_plots(
 #   output_path = "data/super_secret_structure_project/test_output.pdf"
 # )
 
-# coords_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.coords.txt"
-# tess_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga_TESS_qmatrix.csv"
-# xval_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga_TESS_xval.csv"
-# cv_errors_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/admixture/logs/5-Mirounga_best_K.txt"
-# eigenvec_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.eigenvec"
-# eigenval_file = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/5-Mirounga.eigenval"
-# admixture_path = "/scratch2/erik/CCGP-reruns/projects/5-Mirounga/results/GCA_029215605.1/algatr/admixture/Q_files/5-Mirounga"
+# coords_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/29-Carcharodon.coords.txt"
+# tess_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/29-Carcharodon_TESS_qmatrix.csv"
+# xval_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/29-Carcharodon_TESS_xval.csv"
+# cv_errors_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/admixture/logs/29-Carcharodon_best_K.txt"
+# eigenvec_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/29-Carcharodon.eigenvec"
+# eigenval_file = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/29-Carcharodon.eigenval"
+# admixture_path = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/admixture/Q_files/29-Carcharodon"
+# fam = "/scratch2/erik/CCGP-reruns/projects/29-Carcharodon/results/GCA_036900845.1/algatr/admixture/29-Carcharodon.fam"

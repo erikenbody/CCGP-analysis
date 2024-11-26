@@ -1,5 +1,4 @@
-        
-def get_k(wc):
+def get_k_values(wc):
     pops = checkpoints.distinguish_populations.get(**wc).output[1]
 
     k_values = []
@@ -10,10 +9,22 @@ def get_k(wc):
         
         files = [file.name for file in pops_dir.iterdir() if file.is_file()]
         k_values = [file.split("_")[1].split(".")[0] for file in files if file.split("_")[1].split(".")[0].isdigit()]
-        seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
+    return k_values
+
+
+
+
+def get_k(wc):
+    k_values = get_k_values(wc)
+    seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
     out = [
         *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",**wc, k=k_values),
+
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.MAF", variant=["deleterious", "synonymous", "tolerated", "nonsynonymous"], **wc, k=k_values),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}.rxy", **wc, k=k_values)
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_hom_count.txt", **wc, k=k_values),
 
         #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
@@ -50,7 +61,8 @@ checkpoint distinguish_populations:
     input:
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
         coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
-        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam",
+        composite = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf",
     output:
         out1 = "results/{refGenome}/pop_analysis/{prefix}_admixture_final.pdf",
         outdir = directory("results/{refGenome}/pop_analysis/{prefix}_populations"),
@@ -93,8 +105,8 @@ rule pop_bcf_populations:
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
         pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt"
     output:
-        pop_vcf = temp("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz"),
-        index = temp("results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi")
+        pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        index = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi"
     conda:
         "envs/roh.yml"
     shell:
@@ -107,9 +119,11 @@ rule pop_bcf_populations:
 rule pop_pi_populations:
     input:
         pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
-        bed = "results/{refGenome}/{prefix}_callable_sites.bed"
+        bed = "results/{refGenome}/{prefix}_callable_sites.bed",
+        roh_file = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
     output:
-        pi = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv"
+        out_pi = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv",
+        out_pi_not_roh = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_not_roh.csv"
     conda:
         "envs/pi.yaml"
     params:
@@ -343,7 +357,7 @@ rule pop_merge_roh:
     input:
         rg = "results/{refGenome}/pop_analysis/{prefix}_roh/population_{k}.rg.roh"
     output:
-        merged_rg = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
+        merged_rg_ind = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
     conda:
         "envs/roh.yml"
     params:
@@ -351,6 +365,16 @@ rule pop_merge_roh:
     script:
         "scripts/merge_roh.py"
 
+# rule merge_roh_intervals:
+#     input:
+#         rg = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh",
+#     output:
+#         filtered_roh = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_population_{k}_filtered.rg.roh",
+#         merged_rg = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_population_{k}_merged_across_inds.rg.roh"
+#     conda:
+#         "envs/bedtools.yml"
+#     script:
+#         "scripts/merge_roh_intervals.py"
 
 rule pop_froh:
     input:
@@ -393,3 +417,89 @@ rule update_chromosome_names:
         bcftools annotate --rename-chrs {input.renamed} -Oz -o {output.renamed_snp_vcf} {input.snp_vcf}
         '''
 #########################################################
+#mutation load
+
+rule count_homozygous:
+    input:
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        annotations_file = "results/{refGenome}/pop_analysis/{prefix}_SIFT_chrom_updated.txt",
+    conda:
+        "envs/mutation_load.yml"
+    output:
+        counts = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",
+    script:
+        "scripts/count_deleterious.py"
+
+
+rule count_homozygous_phylop:
+    input:
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        bedgraph = "results/{refGenome}/pop_analysis/{prefix}_phylop_scores_chrom_updated.bedgraph.gz",
+        #bedgraph = "results/{refGenome}/pop_analysis/test_chrom_updated.bedgraph.gz"
+    conda:
+        "envs/mutation_load.yml"
+    output:
+        counts = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_hom_count.txt",
+        sites = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_sites.txt",
+        af = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_af.txt",
+    script:
+        "scripts/count_deleterious_phylop.py"
+
+
+rule create_positions:
+    input:
+        annotations = "results/{refGenome}/pop_analysis/{prefix}_SIFT_chrom_updated.txt"
+    output:
+        pos = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{variant}_positions.txt",
+    conda:
+        "envs/mutation_load.yml"
+    script:
+        "scripts/create_annotation_site_list.py"
+
+#Rxy
+rule run_vcftools:
+    input:
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        positions = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/{variant}_positions.txt"
+    output:
+        freq = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.frq",
+        #counts = "results/{refGenome}/load/counts/{variant}_{k}.count"
+    params:
+        prefix = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}"
+    conda:
+        "envs/mutation_load.yml"
+    shell:
+        """
+        vcftools --gzvcf {input.vcf} \
+                 --positions {input.positions} \
+                 --freq \
+                 --out {params.prefix}
+        """
+
+rule extract_maf:
+    input:
+        freq = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.frq",
+    output:
+        "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.MAF"
+    shell:
+        """
+        sed '1d' {input} | cut -f6 | cut -f2 -d ":" > {output}
+        """
+
+def get_maf_files(wildcards):
+    k_values = get_k_values(wildcards)
+    return expand(
+        "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.MAF",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, k=k_values, variant=["deleterious", "synonymous", "tolerated", "nonsynonymous"])
+
+rule calc_rxy:
+    input:
+        get_maf_files
+    output:
+        rxy_out = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}.rxy",
+        plot_out = "results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}_rxy.png"
+    conda:
+        "envs/pie.yml"
+    script:
+        "scripts/calc_Rxy.R"
+    
