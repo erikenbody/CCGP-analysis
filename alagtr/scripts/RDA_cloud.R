@@ -70,16 +70,11 @@ peakRAM_imp <-
                              vcf_path = snakemake@input[["vcf"]])
 
   )
-print("got here 1")
 
 # Extract and standardize environmental variables and make into dataframe
 env <- raster::extract(dat$envlayers, dat$coords)
-print(dat$coords)
-print(dat$envlayers)
 env <- scale(env, center = TRUE, scale = TRUE)
 env <- data.frame(env)
-print(env)
-print("got here 2")
 
 # Run RDA -----------------------------------------------------------------
 
@@ -158,7 +153,6 @@ peakRAM_run <-
                       R2permutations = R2permutations, 
                       R2scope = R2scope)
   )
-print("got here 3")
 
 
 # Get outliers and run cortest --------------------------------------------
@@ -285,47 +279,33 @@ scalload_output = snakemake@output[["scalload_output"]]
 unscalload_output = snakemake@output[["unscalload_output"]]
 
 # Export results ----------------------------------------------------------
-print(colsum_output)
+
 export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_impute) {
   outlier_helper <- function(df, outlier) {dat <- df %>% dplyr::mutate(outlier_method = outlier)}
-  print("got here 3.1")
   # RDA model results
   #saveRDS(mod, file = paste0(output_path, species, "_RDA_model_", model, ".RDS"))
   #saveRDS(mod, file = rda_output)
   # Export raw values from RDA model result
   data.frame(mod$colsum) %>% rownames_to_column(var = "locus") %>% write_csv(file = colsum_output, col_names = TRUE)
-  print("got here 3.1.1")
   data.frame(mod$Ybar) %>% rownames_to_column(var = "INDV") %>% write_csv(file = ybar_output, col_names = TRUE)
-  print("got here 3.1.2")
   data.frame(mod$CCA$v) %>% rownames_to_column(var = "locus") %>% write_csv(file = v_output, col_names = TRUE)
-  print("got here 3.1.3")
   data.frame(mod$CCA$u) %>% rownames_to_column(var = "INDV") %>% write_csv(file = u_output, col_names = TRUE)
-  print("got here 3.1.4")
   data.frame(mod$CCA$wa) %>% rownames_to_column(var = "INDV") %>% write_csv(file = wa_output, col_names = TRUE)
-  print("got here 3.1.5")
   data.frame(mod$CCA$QR$qr) %>% write_csv(file = qr_output, col_names = TRUE)
-  print("got here 3.1.6")
   data.frame(mod$CCA$eig) %>% rownames_to_column(var = "RDA") %>% write_csv(file = eig_output, col_names = TRUE)
-  print("got here 3.1.7")
   data.frame(mod$CCA$biplot) %>% rownames_to_column(var = "var") %>% write_csv(file = biplot_output, col_names = TRUE)
-  print("got here 3.1.8")
   data.frame(mod$CCA$QR$qraux) %>% write_csv(file = qraux_output, col_names = TRUE)
-  print("got here 3.1.9")
   data.frame(mod$CCA$envcentre) %>% tibble::rownames_to_column(var = "axis") %>% write_csv(file = envcentre_output, col_names = TRUE)
-  print("got here 3.1.10")
   data.frame(mod_chi = mod$tot.chi,
             mod_chi_cca = mod$CCA$tot.chi) %>% write_csv(file = chi_output, col_names = TRUE)
-print("got here 3.2")
 # Export scores (scaled and unscaled); labeled "species" corresponds to v, "sites" corresponds to wa, and "constraints" corresponds to u
 scaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE) %>% write_csv(file = scalload_output, col_names = TRUE)
 unscaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE, scaling = 0) %>% write_csv(file = unscalload_output, col_names = TRUE)
-print("got here 3.3")
   # Sig results Z-scores
   readr::write_csv(rda_sig_z,
                    #file = paste0(output_path, species, "_RDA_outliers_", model, "_Zscores.csv"),
                    file = zscore_output,
                    col_names = TRUE)
-  print("got here 3.4")
   # Sig results p-values
   snps <- rda_sig_p$rdadapt %>% 
     dplyr::mutate(locus = colnames(dat$gen))
@@ -333,16 +313,13 @@ print("got here 3.3")
                    #file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
                    file = rdadapt_output,
                    col_names = TRUE)
-  print(  "got here 3.5")
   # Correlation test results
   cor_test <- rbind(outlier_helper(cor_df_p, outlier = "p"),
                     outlier_helper(cor_df_z, outlier = "z"))
-  print("got here 3.6")
   readr::write_csv(cor_test, 
                    #file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
                    file = cortest_output,
                    col_names = TRUE)
-  print("got here 3.7")
   # Save imputed data
   if (save_impute) {
     write.table(dat$gen, 
@@ -350,20 +327,17 @@ print("got here 3.3")
                 file = imputed_output,
                 sep = " ", row.names = FALSE, col.names = TRUE, quote = FALSE)
   }
-  print("got here 3.8")
   # Build and save Manhattan plot to file
   #plt_manhat <- manhat_plot(mod, outliers)
   #plt_manhat
   ##ggsave(paste0(output_path, species, "_manhatplot.png"), width = 8, height = 4.5, bg = "white")
   #ggsave(manhat_output, width = 8, height = 4.5, bg = "white")
 }
-print("got here 4")
 # Export results
 peakRAM_exp <- 
   peakRAM::peakRAM(
     export_rda(mod$mod, outliers$rda_sig_z, outliers$rda_sig_p, cortest$cor_df_p, cortest$cor_df_z, save_impute = save_impute)
   )
-print("got here 5")
 
 
 # Export RAM usage --------------------------------------------------------
