@@ -149,6 +149,7 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 get_envlayers <- function(env_path, rmislands = FALSE){
   # Get PC layers
   env_files <- list.files(paste0(env_path, "PC_layers"), full.names = TRUE)
+  print(env_files)
   envlayers <- raster::stack(env_files)
   
   # CA shape file
