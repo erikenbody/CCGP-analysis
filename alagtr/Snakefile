@@ -259,70 +259,83 @@ rule algatr_RDA:
     benchmark:
         "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.RDA.benchmark.txt",
     output: 
-        rda_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_model_full.RDS",
+        #rda_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_model_full.RDS",
         zscore_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
         rdadapt_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
         cortest_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
         imputed_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
         peakram_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
         #manhat_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_manhattan_full.png"
+        colsum_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+        ybar_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+        v_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+        u_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+        wa_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+        qr_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+        eig_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+        biplot_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+        qraux_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+        envcentre_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+        chi_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+        scalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+        unscalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
     conda:
         "envs/algatr.yml"
     script:
         "scripts/RDA_cloud.R"
 
-rule algatr_RDA_pruned:
-    """
-    call algatr tess on a pruned dataset
-    """
-    input:
-        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
-        env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
-        #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
-        #prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
-        prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
-        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
-    params:
-        species = config['final_prefix'],
-        data_path = "results/{refGenome}/",
-        output_path = "results/{refGenome}/algatr/",
-        rmislands = "false",
-        pruned = "true",
-        impute = "simple",
-        kvals = "1:10",
-        correctGEO = "false",
-        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        nPC = 10,
-        model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
-        sig = 0.01, # only for outlier_method = "p"
-        z = 3, # only for outlier_method = "z"
-        Pin = 0.05,
-        R2permutations = 1000,
-        R2scope = "true",
-        p_adj = "fdr", # only if outlier_method = "p"
-        save_impute = "true",
-        intervals = "true",
-        scaff = "NA"
-    resources:
-        mem_mb = lambda wildcards, attempt: attempt * 2000
-    log:
-        log = "logs/{refGenome}/algatr/{prefix}.RDA.txt"
-    benchmark:
-        "results/{refGenome}/benchmarks/{prefix}.RDA.benchmark.txt",
-    output: 
-        #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
-        impute = "results/{refGenome}/algatr/{prefix}_imputed_simple.txt", 
-        #anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv", #uncomment this later, but this file isnt appearing
-        #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
-        #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
-        #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
-        #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
-    conda:
-        "envs/algatr.yml"
-    script:
-        "scripts/RDA_cloud.R"
+# rule algatr_RDA_pruned:
+#     """
+#     call algatr tess on a pruned dataset
+#     """
+#     input:
+#         #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+#         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+#         #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+#         #prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+#         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+#         prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+#         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
+#     params:
+#         species = config['final_prefix'],
+#         data_path = "results/{refGenome}/",
+#         output_path = "results/{refGenome}/algatr/",
+#         rmislands = "false",
+#         pruned = "true",
+#         impute = "simple",
+#         kvals = "1:10",
+#         correctGEO = "false",
+#         correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         nPC = 10,
+#         model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+#         sig = 0.01, # only for outlier_method = "p"
+#         z = 3, # only for outlier_method = "z"
+#         Pin = 0.05,
+#         R2permutations = 1000,
+#         R2scope = "true",
+#         p_adj = "fdr", # only if outlier_method = "p"
+#         save_impute = "true",
+#         intervals = "true",
+#         scaff = "NA"
+#     resources:
+#         mem_mb = lambda wildcards, attempt: attempt * 2000
+#     log:
+#         log = "logs/{refGenome}/algatr/{prefix}.RDA.txt"
+#     benchmark:
+#         "results/{refGenome}/benchmarks/{prefix}.RDA.benchmark.txt",
+#     output: 
+#         #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
+#         impute = "results/{refGenome}/algatr/{prefix}_imputed_simple.txt", 
+#         #anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv", #uncomment this later, but this file isnt appearing
+#         #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
+#         #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
+#         #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
+#         #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+#     conda:
+#         "envs/algatr.yml"
+#     script:
+#         "scripts/RDA_cloud.R"
 
 # rule shapeit:
 #     input:
