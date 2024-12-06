@@ -80,7 +80,6 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   dat <- check_ccgp_data(gen = gen, coords = coords, filetype = analysis)
   
   # Get envlayers -----------------------------------------------------------
-  # Get envlayers -----------------------------------------------------------
   if (incl_env) {
     env <- get_envlayers(env_path = paste0(snakemake@scriptdir, "/../../data/"), rmislands = rmislands)
     #env <- get_envlayers(env_path = "/scratch2/erik/CCGP-reruns/data/", rmislands = rmislands)
@@ -148,9 +147,12 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 #' @export
 get_envlayers <- function(env_path, rmislands = FALSE){
   # Get PC layers
+  # TODO no longer a list of tifs but a single stack, change file naming
   env_files <- list.files(paste0(env_path, "PC_layers"), full.names = TRUE)
   print(env_files)
   envlayers <- raster::stack(env_files)
+  
+  # TODO add BIO1 in here
   
   # CA shape file
   spdf <- rgdal::readOGR(paste0(env_path, "CA_State/CA_State_TIGER2016.shp"))
