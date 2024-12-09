@@ -48,6 +48,9 @@ p_adj = snakemake@params[[17]] # only if outlier_method = "p"
 save_impute = as.logical(snakemake@params[[18]])
 intervals = as.logical(snakemake@params[[19]])
 scaff = as.character(snakemake@params[[20]])
+env_path = as.character(snakemake@params[[21]])
+layers = as.character(snakemake@params[[22]])
+shape_path = as.character(snakemake@params[[23]])
 
 #need to interpret the kvals string as an expression
 kvals <- try(eval(parse(text = kvals)), silent = TRUE)
@@ -124,6 +127,8 @@ if (!is.null(ncol(dat$gen))) {
   env <- raster::extract(dat$envlayers, dat$coords)
   env <- scale(env, center = TRUE, scale = TRUE)
   env <- data.frame(env)
+  # When only one env layer provided, env colnames will be named simply 'env' which is not informative
+  if (ncol(env) == 1) colnames(env) <- names(dat$envlayers)
 
   # Run RDA -----------------------------------------------------------------
 
@@ -245,6 +250,12 @@ if (!is.null(ncol(dat$gen))) {
         rda_sig_p <- NULL
         rda_gen_p <- NULL
       }
+      # p-values can't be calculated if there are fewer than 2 RDA axes
+      if (length(ncol(mod$CCA$v) == 1)) {
+        print("p-values cannot be calculated if fewer than 2 RDA axes")
+        rda_sig_p <- NULL
+        rda_gen_p <- NULL 
+      }
     }
     if (!is.null(safe_rda_sig_p$error)) {
       rda_sig_p <- NULL
@@ -287,7 +298,7 @@ if (!is.null(ncol(dat$gen))) {
     peakRAM::peakRAM(
       cortest <- run_cortest(rda_gen_p = outliers$rda_gen_p, rda_gen_z = outliers$rda_gen_z, env = mod$env)
     )
-  print(cortest)
+  print(summary(cortest))
 
   # Manhattan plot ----------------------------------------------------------
 
