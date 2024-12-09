@@ -18,7 +18,6 @@
 #'
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
-#' NOTE: requires a common dir containing env files. Within that dir, must contain "PC_layers" and "CA_State" dirs
 get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", 
   kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE, vcf_path) {
   
@@ -81,7 +80,7 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
   
   # Get envlayers -----------------------------------------------------------
   if (incl_env) {
-    env <- get_envlayers(env_path = paste0(snakemake@scriptdir, "/../../data/"), rmislands = rmislands)
+    env <- get_envlayers(env_path = snakemake@params[[21]], shape_path = snakemake@params[[23]], layers = snakemake@params[[22]], rmislands = rmislands)
     #env <- get_envlayers(env_path = "/scratch2/erik/CCGP-reruns/data/", rmislands = rmislands)
   } else {
     env <- NULL
@@ -141,25 +140,27 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 #' Get PC envlayers and remove islands; requires env_path/PC_layers and env_path/CA_State
 #'
 #' @param env_path path to PC layers
+#' @param shape_path path to shapefile
+#' @param layers names of layers to be retained in raster stack; options are "all" (for all layers in tif; default) or list of names
 #' @param rmislands whether to remove islands or not
 #'
 #' @return envlayers
 #' @export
-get_envlayers <- function(env_path, rmislands = FALSE){
-  # Get PC layers
-  # TODO no longer a list of tifs but a single stack, change file naming
-  env_files <- list.files(paste0(env_path, "PC_layers"), full.names = TRUE)
-  print(env_files)
-  envlayers <- raster::stack(env_files)
+get_envlayers <- function(env_path, shape_path, layers = "all", rmislands = FALSE){
+  # Get env layers
+  # env_files <- list.files(paste0(env_path, "PC_layers"), full.names = TRUE)
+  envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
+
+  # Subset particular layers of env object if so desired
+  if (all(layers != "all")) envlayers <- raster::subset(x = envlayers, subset = layers)
+  print(summary(envlayers))
   
-  # TODO add BIO1 in here
-  
-  # CA shape file
-  spdf <- rgdal::readOGR(paste0(env_path, "CA_State/CA_State_TIGER2016.shp"))
-  CA_boundary <- sp::spTransform(spdf, raster::crs("+proj=longlat +datum=WGS84 +no_defs"))
+  # Shape file of region of interest
+  spdf <- rgdal::readOGR(paste0(snakemake@scriptdir, shape_path))
+  boundary <- sp::spTransform(spdf, raster::crs("+proj=longlat +datum=WGS84 +no_defs"))
   
   # Remove islands
-  if(rmislands == TRUE) envlayers <- algatr::rm_islands(envlayers, CA_boundary)
+  if(rmislands == TRUE) envlayers <- algatr::rm_islands(envlayers, boundary)
   
   return(envlayers)
 }

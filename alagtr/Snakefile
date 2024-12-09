@@ -242,7 +242,7 @@ rule algatr_RDA:
         correctGEO = "false",
         correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
         nPC = 10,
-        model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+        model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
         sig = 0.01, # only for outlier_method = "p"
         z = 3, # only for outlier_method = "z"
         Pin = 0.05,
@@ -251,7 +251,12 @@ rule algatr_RDA:
         p_adj = "fdr", # only if outlier_method = "p"
         save_impute = "true",
         intervals = "true",
-        scaff = "{scaff}"
+        scaff = "{scaff}",
+        env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
+        layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
+        # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", # raw envlayers
+        # layers = "CHELSA_bio1_1981.2010_V.2.1", # run on BIO1 only
+        shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp"
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
     log:
