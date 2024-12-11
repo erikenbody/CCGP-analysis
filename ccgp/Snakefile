@@ -16,7 +16,7 @@ rule roh:
     shell:
         """
         bcftools roh --threads 10 -G30 --AF-dflt 0.4 -O z -o {output.roh} {input.vcf}
-        zgrep RG {output.roh} > {output.rg}
+        zgrep -E '^RG[[:space:]]|# RG' {output.roh} > {output.rg}
         """
 
 rule froh:

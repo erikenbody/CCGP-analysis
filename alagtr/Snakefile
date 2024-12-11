@@ -289,6 +289,110 @@ rule algatr_RDA:
     script:
         "scripts/RDA_cloud.R"
 
+def gather_rda(wildcards):
+    result = dict(
+        zscore_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        rdadapt_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        cortest_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        imputed_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        peakram_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        colsum_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        ybar_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        v_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        u_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        wa_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        qr_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        eig_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        biplot_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        qraux_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        envcentre_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        chi_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        scalload_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        unscalload_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        )
+    )
+    return result
+
+#uncomment lines you add to the script
+rule gather_rda:
+    input:
+        unpack(gather_rda)
+    output:
+        zscore_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",
+        # rdadapt_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_rdadapt.csv",
+        # cortest_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_cortest_full.csv",
+        # imputed_output = "results/{refGenome}/algatr/RDA/{prefix}_imputed_simple.txt",
+        # peakram_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_peakRAM.csv",
+        # #manhat_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png,
+        # colsum_output = "results/{refGenome}/algatr/RDA/{prefix}_colsum.csv",
+        # ybar_output = "results/{refGenome}/algatr/RDA/{prefix}_Ybar.csv",
+        # v_output = "results/{refGenome}/algatr/RDA/{prefix}_v.csv",
+        # u_output = "results/{refGenome}/algatr/RDA/{prefix}_u.csv",
+        # wa_output = "results/{refGenome}/algatr/RDA/{prefix}_wa.csv",
+        # qr_output = "results/{refGenome}/algatr/RDA/{prefix}_qr.csv",
+        # eig_output = "results/{refGenome}/algatr/RDA/{prefix}_eig.csv",
+        # biplot_output = "results/{refGenome}/algatr/RDA/{prefix}_biplot.csv",
+        # qraux_output = "results/{refGenome}/algatr/RDA/{prefix}_qraux.csv",
+        # envcentre_output = "results/{refGenome}/algatr/RDA/{prefix}_envcentre.csv",
+        # chi_output = "results/{refGenome}/algatr/RDA/{prefix}_totchi.csv",
+        # scalload_output = "results/{refGenome}/algatr/RDA/{prefix}_scaledloadings.csv",
+        # unscalload_output = "results/{refGenome}/algatr/RDA/{prefix}_unscaledloadings.csv",
+    script:
+        "scripts/gather_rda.R"
+
 # rule algatr_RDA_pruned:
 #     """
 #     call algatr tess on a pruned dataset
