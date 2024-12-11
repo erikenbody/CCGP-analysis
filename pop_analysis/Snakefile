@@ -20,7 +20,7 @@ def get_k(wc):
     out = [
         *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
-        *expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",**wc, k=k_values),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",**wc, k=k_values),
 
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.MAF", variant=["deleterious", "synonymous", "tolerated", "nonsynonymous"], **wc, k=k_values),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}.rxy", **wc, k=k_values)
@@ -123,7 +123,8 @@ rule pop_pi_populations:
         roh_file = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
     output:
         out_pi = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv",
-        out_pi_not_roh = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_not_roh.csv"
+        #out_pi_not_roh = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_not_roh.csv",
+        out_het = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_het.csv"
     conda:
         "envs/pi.yaml"
     params:
@@ -350,7 +351,7 @@ rule pop_roh:
     shell:
         """
         bcftools roh --threads 10 -G30 -Oz -o {output.roh} {input.pop_vcf}
-        zgrep RG {output.roh} > {output.rg}
+        zgrep -E '^RG[[:space:]]|# RG' {output.roh} > {output.rg}
         """
 
 rule pop_merge_roh:
