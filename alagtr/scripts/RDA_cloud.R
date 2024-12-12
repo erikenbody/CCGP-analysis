@@ -251,7 +251,7 @@ if (!is.null(ncol(dat$gen))) {
         rda_gen_p <- NULL
       }
       # p-values can't be calculated if there are fewer than 2 RDA axes
-      if (length(ncol(mod$CCA$v) == 1)) {
+      if (ncol(mod$CCA$v) == 1) {
         print("p-values cannot be calculated if fewer than 2 RDA axes")
         rda_sig_p <- NULL
         rda_gen_p <- NULL 
