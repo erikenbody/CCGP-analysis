@@ -377,6 +377,8 @@ rule gather_rda:
         unpack(gather_rda)
     conda:
         "envs/pie.yml"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_gather_rda.txt"
     output:
         zscore_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",
         rdadapt_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_rdadapt.csv",
@@ -398,6 +400,18 @@ rule gather_rda:
         unscalload_output = "results/{refGenome}/algatr/RDA/{prefix}_unscaledloadings.csv",
     script:
         "scripts/gather_rda.R"
+
+rule manhattan:
+    input:
+        rdadapt_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_rdadapt.csv",
+    conda:
+        "envs/pie.yml"
+    params:
+        sig = 7
+    output:
+        manhattan_plot = "results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png"
+    script:
+        "scripts/MANHATTAN.R"
 
 # rule algatr_RDA_pruned:
 #     """
