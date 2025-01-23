@@ -252,10 +252,15 @@ rule algatr_RDA:
         save_impute = "true",
         intervals = "true",
         scaff = "{scaff}",
+        ## For raster PCs (3 env vars)
         env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
         layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
+        ## For only BIO1
         # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", # raw envlayers
-        # layers = "CHELSA_bio1_1981.2010_V.2.1", # run on BIO1 only
+        # layers = "CHELSA_bio1_1981.2010_V.2.1"
+        ## For BIO1 + NDVI
+        # env_path = c("/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"), # path to envlayers
+        # layers = c("CHELSA_bio1_1981.2010_V.2.1", "NDVI")
         shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp"
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
