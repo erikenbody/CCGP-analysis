@@ -11,7 +11,7 @@ log_smk <- function() {
 
 log_smk()
 
-zscore_input <- snakemake@output[["zscore_output"]]
+zscore_input <- snakemake@input[["zscore_output"]]
 rdadapt_input <- snakemake@input[["rdadapt_output"]]
 cortest_input <- snakemake@input[["cortest_output"]]
 #imputed_input <- snakemake@input[["imputed_output"]]
@@ -49,31 +49,13 @@ chi_output <- snakemake@output[["chi_output"]]
 scalload_output <- snakemake@output[["scalload_output"]]
 unscalload_output <- snakemake@output[["unscalload_output"]]
 
-# concat_samples <- function(input_files, output_file){
-#     # Read the first file and write its header and content to the output file
-#     first_file <- readLines(input_files[1])
-#     header <- first_file[1]
-#     writeLines(first_file, output_file)
-
-#     # Append the content of the remaining files, skipping their headers
-#     for (file in input_files[-1]) {
-#         lines <- readLines(file)
-#         cat(lines[-1], file = output_file, sep = "\n", append = TRUE)
-#     }
-# }
-
 concat_samples <- function(input_files, output_file){
     all_data <- list()
-    
-    add_scaff_col <- function(data, file){
-        data <- data %>% mutate(scaff = basename(dirname(file)))
-        return(data)
-    }
 
     for (file in input_files) {
         if (file.info(file)$size > 0) {
             print(file)
-            data <- read_tsv(file, col_types = cols(.default = "c"))
+            data <- read_csv(file, col_types = cols(.default = "c"))
             data <- data %>% mutate(scaff = basename(dirname(file)))
             all_data <- c(all_data, list(data))  # Use `c()` to concatenate data frames
         } else {
@@ -83,7 +65,7 @@ concat_samples <- function(input_files, output_file){
     
     if (length(all_data) > 0) {
         combined_data <- bind_rows(all_data, .id = "path")
-        write_tsv(combined_data, output_file)
+        write_csv(combined_data, output_file)
     } else {
         file.create(output_file)
     }
