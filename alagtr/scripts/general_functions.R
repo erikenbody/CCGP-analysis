@@ -139,20 +139,36 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 
 #' Get PC envlayers and remove islands; requires env_path/PC_layers and env_path/CA_State
 #'
-#' @param env_path path to PC layers
+#' @param env_path path to environmental layers (max of 2 accepted; first will be used to standardize extent and resolution)
 #' @param shape_path path to shapefile
 #' @param layers names of layers to be retained in raster stack; options are "all" (for all layers in tif; default) or list of names
 #' @param rmislands whether to remove islands or not
 #'
 #' @return envlayers
 #' @export
-get_envlayers <- function(env_path, shape_path, layers = "all", rmislands = FALSE){
-  # Get env layers
-  # env_files <- list.files(paste0(env_path, "PC_layers"), full.names = TRUE)
-  envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
+get_envlayers <- function(env_path, shape_path, layers = "all", rmislands = FALSE) {
+  if (length(env_path) == 1) {
+    # Get env layers
+    envlayers <- raster::stack(env_path)
+    # envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
+  }
+
+  if (length(env_path) == 2) {
+    env1 <- raster::stack(env_path[[1]])
+    env2 <- raster::stack(env_path[[2]])
+    # env1 <- raster::stack(paste0(snakemake@scriptdir, env_path[[1]]))
+    # env2 <- raster::stack(paste0(snakemake@scriptdir, env_path[[2]]))
+
+    # Match extents so they can be combined
+    env2 <- terra::resample(terra::rast(env2), terra::rast(env1))
+
+    # Combine into single raster stack
+    envlayers <- raster::stack(env1, raster::stack(env2))
+  }
 
   # Subset particular layers of env object if so desired
   if (all(layers != "all")) envlayers <- raster::subset(x = envlayers, subset = layers)
+
   print(summary(envlayers))
   
   # Shape file of region of interest
