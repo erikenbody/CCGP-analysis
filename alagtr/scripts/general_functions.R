@@ -149,15 +149,15 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 get_envlayers <- function(env_path, shape_path, layers = "all", rmislands = FALSE) {
   if (length(env_path) == 1) {
     # Get env layers
-    envlayers <- raster::stack(env_path)
-    # envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
+    # envlayers <- raster::stack(env_path)
+    envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
   }
 
   if (length(env_path) == 2) {
-    env1 <- raster::stack(env_path[[1]])
-    env2 <- raster::stack(env_path[[2]])
-    # env1 <- raster::stack(paste0(snakemake@scriptdir, env_path[[1]]))
-    # env2 <- raster::stack(paste0(snakemake@scriptdir, env_path[[2]]))
+    # env1 <- raster::stack(env_path[[1]])
+    # env2 <- raster::stack(env_path[[2]])
+    env1 <- raster::stack(paste0(snakemake@scriptdir, env_path[[1]]))
+    env2 <- raster::stack(paste0(snakemake@scriptdir, env_path[[2]]))
 
     # Match extents so they can be combined
     env2 <- terra::resample(terra::rast(env2), terra::rast(env1))

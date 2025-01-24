@@ -72,7 +72,7 @@ peakRAM_imp <-
                              intervals = intervals,
                              scaff = scaff,
                              vcf_path = snakemake@input[["vcf"]])
-
+    
   )
 
 # Explicit outputs --------------------------------------------------------
@@ -122,16 +122,16 @@ if (is.null(ncol(dat$gen))) {
 
 if (!is.null(ncol(dat$gen))) {
   # Env vars ----------------------------------------------------------------
-
+  
   # Extract and standardize environmental variables and make into dataframe
   env <- raster::extract(dat$envlayers, dat$coords)
   env <- scale(env, center = TRUE, scale = TRUE)
   env <- data.frame(env)
   # When only one env layer provided, env colnames will be named simply 'env' which is not informative
   if (ncol(env) == 1) colnames(env) <- names(dat$envlayers)
-
+  
   # Run RDA -----------------------------------------------------------------
-
+  
   #' Redefined algatr `rda_run()` function to take in Plink PC files for pRDA correctPC
   #'
   #' @param gen genotype dosage matrix (rows = individuals & columns = SNPs) or `vcfR` object
@@ -147,9 +147,8 @@ if (!is.null(ncol(dat$gen))) {
   #'
   #' @return RDA model
   #' @export
-
   rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FALSE, correctPC = NULL, nPC = 3,
-                        Pin = 0.05, R2permutations = 1000, R2scope = T) {
+                         Pin = 0.05, R2permutations = 1000, R2scope = T) {
     
     # Check that env var names don't match coord names
     if (any(colnames(coords) %in% colnames(env))) {
@@ -159,9 +158,9 @@ if (!is.null(ncol(dat$gen))) {
     
     # Read in PCs
     pc <- readr::read_tsv(paste0(correctPC)) %>%
-            tibble::column_to_rownames(var = "#IID") %>% 
-            dplyr::select(tidyselect::all_of(1:nPC))
-
+      tibble::column_to_rownames(var = "#IID") %>% 
+      dplyr::select(tidyselect::all_of(1:nPC))
+    
     # Handle NA values -----------------------------------------------------
     if (any(is.na(gen))) {
       stop("Missing values found in gen data")
@@ -176,7 +175,7 @@ if (!is.null(ncol(dat$gen))) {
       env <- env[complete.cases(na_env), ]
       if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
     }
-
+    
     # Set up model ------------------------------------------------------------
     # Check env var naming ----------------------------------------------------
     if(any(colnames(pc) %in% colnames(env))) {
@@ -186,14 +185,14 @@ if (!is.null(ncol(dat$gen))) {
     print(paste0("env object has ", nrow(env), " rows"))
     print(paste0("pc object has ", nrow(pc), " rows"))
     print(paste0("gen object has ", nrow(gen), " rows"))
-
+    
     moddf <- data.frame(env, pc)
     f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
-
+    
     mod <- vegan::rda(f, data = moddf)
     return(list(gen = gen, mod = mod, env = env))
   }
-
+  
   peakRAM_run <-
     peakRAM::peakRAM(
       mod <- rda_run_pc(gen = dat$gen,
@@ -207,15 +206,43 @@ if (!is.null(ncol(dat$gen))) {
                         R2permutations = R2permutations, 
                         R2scope = R2scope)
     )
-
-
+  
+  
   # Get outliers and run cortest --------------------------------------------
-
+  
+  # Determine RDA outliers based on Z-scores; function from algatr package
+  z_outlier_method <- function(mod, naxes, z) {
+    if (naxes == "all") naxes <- ncol(mod$CCA$v)
+    load.rda <- vegan::scores(mod, choices = 1:naxes, display = "species")
+    
+    results <-
+      purrr::map(1:ncol(load.rda), ~z_outlier_helper(.x, load.rda, z)) %>%
+      dplyr::bind_rows()
+    
+    return(results)
+  }
+  # z_outlier_method helper function; function from algatr package
+  z_outlier_helper <- function(axis, load.rda, z) {
+    x <- load.rda[, axis]
+    out <- outliers(x, z)
+    cand <- cbind.data.frame(names(out), rep(axis, times = length(out)), unname(out))
+    colnames(cand) <- c("rda_snps", "axis", "loading")
+    cand$rda_snps <- as.character(cand$rda_snps)
+    return(cand)
+  }
+  # Z-scores outlier finder
+  outliers <- function(x, z) {
+    lims <- mean(x) + c(-1, 1) * z * sd(x) # find loadings +/-z sd from mean loading
+    x[x < lims[1] | x > lims[2]] # SNP names in these tails
+  }
+  
   get_outliers <- function(mod, gen) {
     safe_rda_getoutliers <- purrr::safely(algatr::rda_getoutliers)
-    safe_rda_sig_z <- safe_rda_getoutliers(mod, naxes = "all", outlier_method = "z", z = 3, plot = FALSE)
+    safe_z_outlier_method <- purrr::safely(z_outlier_method)
+    # safe_rda_sig_z <- safe_rda_getoutliers(mod, naxes = "all", outlier_method = "z", z = z, plot = FALSE)
+    safe_rda_sig_z <- safe_z_outlier_method(mod, naxes = "all", z = z)
     safe_rda_sig_p <- safe_rda_getoutliers(mod, naxes = "all", outlier_method = "p", p_adj = p_adj, sig = sig, plot = FALSE)
-
+    
     # If any of the above error out, assign NULL value to object in result
     if (is.null(safe_rda_sig_z$error)) {
       if (nrow(safe_rda_sig_z$result) > 0) {
@@ -262,7 +289,7 @@ if (!is.null(ncol(dat$gen))) {
       rda_gen_p <- NULL
       print(safe_rda_sig_p$error)
     }
-
+    
     results <- list(rda_sig_z = rda_sig_z,
                     rda_sig_p = rda_sig_p,
                     rda_gen_p = rda_gen_p,
@@ -270,14 +297,14 @@ if (!is.null(ncol(dat$gen))) {
     
     return(results)
   }
-
+  
   peakRAM_outliers <-
     peakRAM::peakRAM(
       outliers <- get_outliers(mod = mod$mod, gen = mod$gen)
     )
-
+  
   print(summary(outliers)) # to assess whether there are NULL objects
-
+  
   # Run correlation test
   run_cortest <- function(rda_gen_p, rda_gen_z, env) {
     # Check if either outlier detection method is NULL
@@ -293,15 +320,15 @@ if (!is.null(ncol(dat$gen))) {
     
     return(results)
   }
-
+  
   peakRAM_cortest <-
     peakRAM::peakRAM(
       cortest <- run_cortest(rda_gen_p = outliers$rda_gen_p, rda_gen_z = outliers$rda_gen_z, env = mod$env)
     )
   print(summary(cortest))
-
+  
   # Manhattan plot ----------------------------------------------------------
-
+  
   manhat_plot <- function(mod, outliers) {
     # Make and get tidy data frames for plotting
     snp_scores <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), display = "species", scaling = "none")
@@ -346,7 +373,7 @@ if (!is.null(ncol(dat$gen))) {
       ggplot2::geom_point(data = TAB_manhattan %>% dplyr::filter(type == "Non-outlier"), 
                           ggplot2::aes(x = pos, y = -log10(pvalues), col = chrom), size = 1.4, alpha = 0.75) +
       ggplot2::scale_color_manual(values = rep(c("#276FBF","#183059"), 
-                                              ceiling(length(unique(TAB_manhattan$chrom))/2))[1:length(unique(TAB_manhattan$chrom))]) +
+                                               ceiling(length(unique(TAB_manhattan$chrom))/2))[1:length(unique(TAB_manhattan$chrom))]) +
       ggplot2::theme_bw(base_size = 11) +
       ggplot2::theme(
         legend.position = "none",
@@ -357,9 +384,9 @@ if (!is.null(ncol(dat$gen))) {
     
     return(plt_manhat)
   }
-
+  
   # Export results ----------------------------------------------------------
-
+  
   export_rda <- function(mod, rda_sig_z, rda_sig_p, cor_df_p, cor_df_z, save_impute) {
     outlier_helper <- function(df, outlier) {dat <- df %>% dplyr::mutate(outlier_method = outlier)}
     
@@ -378,11 +405,11 @@ if (!is.null(ncol(dat$gen))) {
     data.frame(mod$CCA$QR$qraux) %>% write_csv(file = qraux_output, col_names = TRUE)
     data.frame(mod$CCA$envcentre) %>% tibble::rownames_to_column(var = "axis") %>% write_csv(file = envcentre_output, col_names = TRUE)
     data.frame(mod_chi = mod$tot.chi,
-              mod_chi_cca = mod$CCA$tot.chi) %>% write_csv(file = chi_output, col_names = TRUE)
+               mod_chi_cca = mod$CCA$tot.chi) %>% write_csv(file = chi_output, col_names = TRUE)
     # Export scores (scaled and unscaled); labeled "species" corresponds to v, "sites" corresponds to wa, and "constraints" corresponds to u
     scaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE) %>% write_csv(file = scalload_output, col_names = TRUE)
     unscaled_loadings <- vegan::scores(mod, choices = 1:ncol(mod$CCA$v), tidy = TRUE, scaling = 0) %>% write_csv(file = unscalload_output, col_names = TRUE)
-
+    
     # Outlier results ---------------------------------------------------------
     # Sig results Z-scores
     if (!is.null(rda_sig_z)) readr::write_csv(rda_sig_z,
@@ -394,9 +421,9 @@ if (!is.null(ncol(dat$gen))) {
       snps <- rda_sig_p$rdadapt %>% 
         dplyr::mutate(locus = colnames(dat$gen))
       readr::write_csv(snps,
-                      #file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
-                      file = rdadapt_output,
-                      col_names = TRUE)
+                       #file = paste0(output_path, species, "_RDA_outliers_", model, "_rdadapt.csv"),
+                       file = rdadapt_output,
+                       col_names = TRUE)
     }
     
     # If NULL results for outliers
@@ -412,13 +439,13 @@ if (!is.null(ncol(dat$gen))) {
       if (!is.null(cor_df_p) & is.null(cor_df_z)) cor_test <- outlier_helper(cor_df_p, outlier = "p")
       if (!is.null(cor_df_z) & is.null(cor_df_p)) cor_test <- outlier_helper(cor_df_z, outlier = "z")
       readr::write_csv(cor_test, 
-                      #file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
-                      file = cortest_output,
-                      col_names = TRUE)
+                       #file = paste0(output_path, species, "_RDA_cortest_", model, ".csv"),
+                       file = cortest_output,
+                       col_names = TRUE)
     }
-
+    
     if (is.null(cor_df_z) & is.null(cor_df_p)) file.create(cortest_output)
-
+    
     # Save imputed data -------------------------------------------------------
     if (save_impute) {
       write.table(dat$gen, 
@@ -426,7 +453,7 @@ if (!is.null(ncol(dat$gen))) {
                   file = imputed_output,
                   sep = " ", row.names = FALSE, col.names = TRUE, quote = FALSE)
     }
-
+    
     # Build and save Manhattan plot to file -----------------------------------
     # Only run if p-value outliers detected
     # if (!is.null(outliers$rda_sig_p)) {
@@ -436,23 +463,23 @@ if (!is.null(ncol(dat$gen))) {
     # }
     # if (is.null(outliers$rda_sig_p)) file.create(manhat_output)
   }
-
+  
   # Export results
   peakRAM_exp <- 
     peakRAM::peakRAM(
       export_rda(mod$mod, outliers$rda_sig_z, outliers$rda_sig_p, cortest$cor_df_p, cortest$cor_df_z, save_impute = save_impute)
     )
-
+  
   # Export RAM usage --------------------------------------------------------
-
+  
   RAM <- dplyr::bind_rows(peakRAM_imp,
                           peakRAM_run, 
                           peakRAM_outliers,
                           peakRAM_cortest,
                           peakRAM_exp) %>% 
     dplyr::mutate(fxn = c("import", "run", "outliers", "cortest", "export"))
-
+  
   readr::write_csv(RAM,
-                  #file = paste0(output_path, species, "_RDA_peakRAM.csv"),
-                  file = peakram_output)
+                   #file = paste0(output_path, species, "_RDA_peakRAM.csv"),
+                   file = peakram_output)
 }
