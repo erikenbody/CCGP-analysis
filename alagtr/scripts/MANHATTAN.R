@@ -55,7 +55,48 @@ manhat_plot <- function(mod, outliers) {
             axis.text.x = element_text(angle = 60, size = 4, vjust = 0.5)
         )
 
+
+    chromosomes <- unique(TAB_manhattan$chrom)
+        
+    pdf(snakemake@output[["per_chrom"]], height = 8.5, width = 11)
+    
+    for (chr in chromosomes) {
+        
+        plots_list <- list()
+        
+        df_chr <- TAB_manhattan %>% 
+        filter(chrom == chr)
+        
+        
+        chr_plot <- ggplot2::ggplot() +
+                ggplot2::geom_point(data = df_chr, 
+                                    ggplot2::aes(x = pos, y = -log10(pvalues),), size = 1.4, alpha = 0.75) +
+                #ggplot2::geom_point(data = df_chr %>% dplyr::filter(type == "Outlier"), 
+                #                    ggplot2::aes(x = pos, y = -log10(pvalues),), col = "orange", size = 1.4, alpha = 0.75) +
+                ggplot2::xlab(NULL) +
+                ggplot2::ylab("-log10(p)") +
+                ggplot2::geom_hline(yintercept =sig, linetype = "dashed", color = "black", linewidth = 1) +
+                scale_x_continuous(label = axis_set$chrom, breaks = axis_set$center) +
+                scale_y_continuous(expand = c(0, 0), limits = c(0, ylim)) +
+                #ggplot2::geom_point(data = df_chr %>% dplyr::filter(type == "Non-outlier"), 
+                #                    ggplot2::aes(x = pos, y = -log10(pvalues), col = "black"), size = 1.4, alpha = 0.75) +
+                ggplot2::theme_bw(base_size = 11) +
+                ggplot2::theme(
+                    legend.position = "none",
+                    panel.grid = ggplot2::element_blank(),
+                    plot.background = ggplot2::element_blank(),
+                    axis.text.x = element_text(size = 16, vjust = 0.5)
+                )
+        
+        print(chr_plot)
+        #plots_list[[chr]] <- roh_plot
+        
+    }
+    
+    dev.off()
+
     return(plt_manhat)
+
 }
 
 rdadapt <- snakemake@input[["rdadapt_output"]]
