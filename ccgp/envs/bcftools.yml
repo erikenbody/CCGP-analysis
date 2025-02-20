@@ -3,4 +3,4 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - pandas==2.1.4
+  - bcftools==1.16

@@ -54,7 +54,8 @@ rmislands = as.logical(snakemake@params[[3]])
 kvals = snakemake@params[[4]]
 output_path = snakemake@params[[5]]
 incl_env = as.logical(snakemake@params[[6]])
-
+coords = snakemake@input[["coords"]]
+vcf = snakemake@input[["vcf"]]
 # species <- "5-Mirounga"
 # data_path <- "projects/5-Mirounga/results/GCA_029215605.1/"
 # rmislands = TRUE
@@ -78,7 +79,8 @@ peakRAM_imp <-
                              impute = "none",
                              rmislands = rmislands,
                              incl_env = incl_env,
-                             vcf_path = snakemake@input[["vcf"]])
+                             vcf_path = vcf,
+                             coords = coords)
   )
 
 

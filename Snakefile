@@ -20,7 +20,7 @@ output_contigs = Path("results", config["refgenome"], "algatr", config["final_pr
 #output_path = Path("results", config["refgenome"], "data", "genome", "scaffolds")
 
 output = [
-        expand("results/{refGenome}/CCGP/{prefix}_roh_pi_ridges.pdf",refGenome=config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/CCGP/{prefix}_roh_pi_ridges.pdf",refGenome=config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/trackhub/index.html", refGenome=config['refgenome']),
         expand("results/{refGenome}/CCGP/{prefix}_dist_done.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -34,7 +34,7 @@ output = [
         #expand("results/{refGenome}/feems/{prefix}_pruned_0.6_cv.png", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
         # Algatr
-        expand("results/{refGenome}/algatr/{prefix}.coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        expand("results/{refGenome}/CCGP/{prefix}.coords.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_TESS_pieplot.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
 
@@ -44,11 +44,11 @@ output = [
         #expand("results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf", refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
         
         # RDA output:
-        expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+        #expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
+        expand("results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png",refGenome = config['refgenome'], prefix=config['final_prefix']),
         #expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
-   
-        # RDA LD pruned output:
-         
+            
         # # GONE stuff.
        
         # expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
