@@ -6,7 +6,7 @@ rule algatr_env:
     Its a bit tricky to get this env setup so moving the installation to here
     """
     input: 
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
     output:
         "results/{refGenome}/algatr/{prefix}_env_created.txt"
     conda:
