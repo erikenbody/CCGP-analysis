@@ -36,8 +36,13 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
         if str(sample["*sample_name"]) in vcf_samples:
             sample_name_exist = True
 
-        if sample.get("minicore_seq_id", "Womp") in vcf_samples:
-            minicore_seq_exist = True
+        minicore_seq_ids = sample.get("minicore_seq_id", "")
+        if isinstance(minicore_seq_ids, str):  # Ensure it's a string
+            minicore_seq_ids_list = [seq_id.strip() for seq_id in minicore_seq_ids.split(",")]  # Split and clean
+            if any(seq_id in vcf_samples for seq_id in minicore_seq_ids_list):  # Check if any match
+                minicore_seq_exist = True
+        # if sample.get("minicore_seq_id", "Womp") in vcf_samples:
+        #     minicore_seq_exist = True
         if sample_name_exist and minicore_seq_exist:
             print('IDENTICAL SAMPLE_NAME & MINICORE') 
             print('')
@@ -71,7 +76,17 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
         if minicore_seq_exist:
             print("MINICORE")
             print('')
-            sample_name = sample.get("minicore_seq_id", "")
+            # sample_name = sample.get("minicore_seq_id", "")
+
+            minicore_seq_ids = sample.get("minicore_seq_id", "")
+    
+            if isinstance(minicore_seq_ids, str):
+                sample_name = minicore_seq_ids.split(",")[0].strip()
+            else:
+                sample_name = str(minicore_seq_ids)
+
+
+
             lat = sample.get("lat", "")
             long = sample.get("long", "")
 
@@ -94,8 +109,8 @@ def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
     print(f"Number of samples considered = {len(vcf_samples)}")
     print(f"Number of samples WITH coords for {project}: {num_rows}")
     print(f"Number of samples WITHOUT coords for {project}: {len(no_coords)}")
-    output_file_path = os.path.join(wd_scripts, "results", ref_genome, "algatr", f"{project}.coords.txt")
-    output_file_path_nocoords = os.path.join(wd_scripts, "results", ref_genome, "algatr", f"{project}.no_coords.txt")
+    output_file_path = os.path.join(wd_scripts, "results", ref_genome, "CCGP", f"{project}.coords.txt")
+    output_file_path_nocoords = os.path.join(wd_scripts, "results", ref_genome, "CCGP", f"{project}.no_coords.txt")
     #print(output_file_path)
 
     df.to_csv(output_file_path, sep="\t", index=False, header=False)

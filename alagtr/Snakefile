@@ -16,107 +16,107 @@ rule algatr_env:
     script:
         "scripts/setup_algatr_env.R"
 
-rule algatr_get_vcf_samples:
-    input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-    output:
-        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
-    conda:
-        "envs/bcftools.yml"
-    shell:
-        "bcftools query -l {input.vcf} > {output.samps}"
+# rule algatr_get_vcf_samples:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#     output:
+#         samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         "bcftools query -l {input.vcf} > {output.samps}"
 
-rule algatr_create_coords_sheet:
-    input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
-    output:
-        samps_w_coord = "results/{refGenome}/algatr/{prefix}.coords.txt",
-        exclude_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
-    conda:
-        "envs/mongo.yml"
-    params:
-        project_id = "{prefix}",
-        ref_genome = "{refGenome}",
-        sample_id = config["sample_id"]
-    script:
-        "scripts/create_coord_sheet_revised.py"
+# rule algatr_create_coords_sheet:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+#     output:
+#         samps_w_coord = "results/{refGenome}/algatr/{prefix}.coords.txt",
+#         exclude_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     conda:
+#         "envs/mongo.yml"
+#     params:
+#         project_id = "{prefix}",
+#         ref_genome = "{refGenome}",
+#         sample_id = config["sample_id"]
+#     script:
+#         "scripts/create_coord_sheet_revised.py"
 
-rule algatr_remove_samps_no_coords:
-    input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
-        vcfidx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
+# rule algatr_remove_samps_no_coords:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
         
-        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
-    output:
-        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
-        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi"
-    conda:
-        "envs/bcftools.yml"
-    shell:
-        """
-        if [ ! -s {input.excluded_samps} ]; then
-            cp {input.vcf} {output.filtered_no_coords}
-            cp {input.vcfidx} {output.filtidx_no_coords}
-        else
-            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
-            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
-            bcftools index {output.filtered_no_coords}
-        fi
-        """
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {input.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
 
-rule algatr_remove_samps_no_coords_full:
-    input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
-        vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
-        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
-    output:
-        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
-        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
-    conda:
-        "envs/bcftools.yml"
-    shell:
-        """
-        if [ ! -s {input.excluded_samps} ]; then
-            cp {input.vcf} {output.filtered_no_coords}
-            cp {input.vcfidx} {output.filtidx_no_coords}
-        else
-            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
-            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
-            bcftools index {output.filtered_no_coords}
-        fi
-        """
+# rule algatr_remove_samps_no_coords_full:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {input.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
 
-rule algatr_remove_samps_no_coords_ld06:
-    input:
-        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
-        excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
-    output:
-        filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
-        filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
-        vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
-    conda:
-        "envs/bcftools.yml"
-    shell:
-        """
-        bcftools index {input.vcf}
-        if [ ! -s {input.excluded_samps} ]; then
-            cp {input.vcf} {output.filtered_no_coords}
-            cp {output.vcfidx} {output.filtidx_no_coords}
-        else
-            bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
-            bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
-            bcftools index {output.filtered_no_coords}
-        fi
-        """
+# rule algatr_remove_samps_no_coords_ld06:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         bcftools index {input.vcf}
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {output.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
 
 rule algatr_plink_pca:
     """
     Call plink PCA. Needed for input to RDA analysis
     """
     input:
-        #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+        #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
     params:
         prefix = "results/{refGenome}/algatr/{prefix}"
     output: 
@@ -136,11 +136,11 @@ rule algatr_tess:
     call algatr tess 
     """
     input:
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+        vcf_idx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
-        vcf_idx = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
-        coords2 = "results/{refGenome}/algatr/{prefix}.coords.txt" 
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt" 
     params:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
@@ -169,7 +169,7 @@ rule algatr_tess:
 rule algatr_pieplot:
     input:
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
-        coords = "results/{refGenome}/algatr/{prefix}.coords.txt" 
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt" 
     params:
         species = config['final_prefix'],
     output:
@@ -179,21 +179,21 @@ rule algatr_pieplot:
     script:
         "scripts/pie_plot.R" 
 
-rule algatr_generate_index:
-    input:
-        vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
-    conda:
-        "envs/bcftools.yml"
-    output:
-        csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
-    shell:
-        "bcftools index {input.vcf}"
+# rule algatr_generate_index:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+#     conda:
+#         "envs/bcftools.yml"
+#     output:
+#         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
+#     shell:
+#         "bcftools index {input.vcf}"
 
 rule algatr_separate_vcf:
     input:
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
-        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+        vcf = "results/{refGenome}/CCGP/{prefix}_complete_coords_annotated.vcf.gz",
+        csi = "results/{refGenome}/CCGP/{prefix}_complete_coords_annotated.vcf.gz.csi"
     output:
         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
     conda:
@@ -206,8 +206,8 @@ rule algatr_separate_vcf:
 rule algatr_separate_vcf_ld06:
     input:
         fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
-        vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
-        csi = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi"
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
     output:
         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz"
     conda:
@@ -230,7 +230,7 @@ rule algatr_RDA:
         #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
         vcf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt"
     params:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
@@ -409,7 +409,8 @@ rule manhattan:
     params:
         sig = 7
     output:
-        manhattan_plot = "results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png"
+        manhattan_plot = "results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png",
+        per_chrom = "results/{refGenome}/algatr/RDA/{prefix}_RDA_per_chrom.pdf"
     script:
         "scripts/MANHATTAN.R"
 
@@ -661,7 +662,7 @@ rule admixture_composite:
         evanno_png_path = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_deltak.png",
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
         xval = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
-        coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt",
         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
         eigenval = "results/{refGenome}/algatr/{prefix}.eigenval",
         fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"

@@ -19,11 +19,12 @@
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
 get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", 
-  kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE, vcf_path) {
+  kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE, vcf_path, coords) {
   
   # Get coords --------------------------------------------------------------
 
-  coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
+  #coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
+  coords <- readr::read_tsv(coords, col_names = FALSE)
   colnames(coords) <- c("INDV", "x", "y")
   coords$x <- as.numeric(coords$x)
   coords$y <- as.numeric(coords$y)

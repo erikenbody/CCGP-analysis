@@ -51,6 +51,8 @@ scaff = as.character(snakemake@params[[20]])
 env_path = as.character(snakemake@params[[21]])
 layers = as.character(snakemake@params[[22]])
 shape_path = as.character(snakemake@params[[23]])
+coords = snakemake@input[["coords"]]
+vcf = snakemake@input[["vcf"]]
 
 #need to interpret the kvals string as an expression
 kvals <- try(eval(parse(text = kvals)), silent = TRUE)
@@ -71,7 +73,8 @@ peakRAM_imp <-
                              save_impute = FALSE, # save this for later
                              intervals = intervals,
                              scaff = scaff,
-                             vcf_path = snakemake@input[["vcf"]])
+                             vcf_path =vcf,
+                             coords = coords)
     
   )
 

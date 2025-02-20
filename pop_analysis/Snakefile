@@ -19,6 +19,7 @@ def get_k(wc):
     seeds = list(range(1, 11))  # Create a list of seeds from 1 to 10
     out = [
         *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/het_population_{k}.csv", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",**wc, k=k_values),
 
@@ -60,7 +61,7 @@ rule get_GONE_contigs:
 checkpoint distinguish_populations:
     input:
         tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
-        coords = "results/{refGenome}/algatr/{prefix}.coords.txt",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt",
         fam = "results/{refGenome}/algatr/admixture/{prefix}.fam",
         composite = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf",
     output:
@@ -99,6 +100,9 @@ checkpoint distinguish_populations:
 #         "scripts/population_assignment.py"
     
 rule pop_bcf_populations:
+    '''
+    Note that this does not remove fixed SNPs in 2/5/25 update
+    '''
     input:
         pops = "results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt",
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
@@ -111,8 +115,7 @@ rule pop_bcf_populations:
         "envs/roh.yml"
     shell:
         """
-        bcftools view -S {input.pops} -Ou -a -U {input.vcf} | bcftools +fill-tags -Ou |
-        bcftools view -e 'AF==0 | AF==1 | ref="N" | ALT="."' -O z -o {output.pop_vcf}
+        bcftools view -S {input.pops} -Ou -a -U {input.vcf} | bcftools +fill-tags -O z -o {output.pop_vcf}
         bcftools index {output.pop_vcf}
         """
 
@@ -120,11 +123,12 @@ rule pop_pi_populations:
     input:
         pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
         bed = "results/{refGenome}/{prefix}_callable_sites.bed",
-        roh_file = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh"
+        roh_file = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai"
     output:
         out_pi = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv",
-        #out_pi_not_roh = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_not_roh.csv",
-        out_het = "results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}_het.csv"
+        #out_het_not_roh = "results/{refGenome}/pop_analysis/{prefix}_population_pi/het_population_{k}_not_roh.csv",
+        out_het = "results/{refGenome}/pop_analysis/{prefix}_population_pi/het_population_{k}.csv"
     conda:
         "envs/pi.yaml"
     params:
@@ -170,6 +174,9 @@ rule pop_find_problem_snps:
         '''
 
 rule pop_remove_problem_snps:
+    '''
+    Note added removing SNPs with AF==0 or AF==1, these will be present in the other pop file
+    '''
     input:
         snp_positions = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_snp_positions/position_pop_{k}.txt.gz",
         GONE_pop_vcfs = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz",
@@ -182,7 +189,8 @@ rule pop_remove_problem_snps:
     shell:
         '''
         bcftools index {input.GONE_pop_vcfs}
-        bcftools view -T {input.snp_positions} {input.GONE_pop_vcfs} -Oz -o {output.indel_absent_vcf}
+        bcftools view -T {input.snp_positions} {input.GONE_pop_vcfs} -O u -a -U | bcftools +fill-tags -Ou |
+        bcftools view -e 'AF==0 | AF==1 | ref="N" | ALT="."' -O z -o {output.indel_absent_vcf}
         bcftools index {output.indel_absent_vcf}
         '''
 
