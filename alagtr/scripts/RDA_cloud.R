@@ -142,7 +142,7 @@ if (!is.null(ncol(dat$gen))) {
   #' @param coords dataframe with coordinates (only needed if correctGEO = TRUE) or if env is a Raster* from which values should be extracted
   #' @param model whether to fit the model with all variables ("full") or to perform variable selection to determine the best set of variables ("best"); defaults to "full"
   #' @param correctGEO whether to condition on geographic coordinates (defaults to FALSE)
-  #' @param correctPC path to eigenvector file produced from Plink --pca to condition on PCs from PCA of genotypes; defaults to NULL
+  #' @param correctPC path to eigenvector file produced from Plink --pca to condition on PCs from PCA of genotypes
   #' @param nPC if `correctPC` not NULL, number of PCs to use (defaults to 3)
   #' @param Pin if `model = "best"`, limits of permutation P-values for adding (`Pin`) a term to the model, or dropping (`Pout`) from the model. Term is added if` P <= Pin`, and removed if `P > Pout` (see \link[vegan]{ordiR2step}) (defaults to 0.05)
   #' @param R2permutations if `model = "best"`, number of permutations used in the estimation of adjusted R2 for cca using RsquareAdj (see \link[vegan]{ordiR2step}) (defaults to 1000)
@@ -150,7 +150,7 @@ if (!is.null(ncol(dat$gen))) {
   #'
   #' @return RDA model
   #' @export
-  rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FALSE, correctPC = NULL, nPC = 3,
+  rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FALSE, correctPC, nPC = 3,
                          Pin = 0.05, R2permutations = 1000, R2scope = T) {
     
     # Check that env var names don't match coord names
@@ -159,38 +159,59 @@ if (!is.null(ncol(dat$gen))) {
       warning("env names should differ from x and y. Appending 'env' to env names")
     }
     
-    # Read in PCs
-    pc <- readr::read_tsv(paste0(correctPC)) %>%
-      tibble::column_to_rownames(var = "#IID") %>% 
-      dplyr::select(tidyselect::all_of(1:nPC))
-    
+    if (correctPC == "NULL") correctPC = NULL
+
+    if (!is.null(correctPC)) {
+      # Read in PCs
+      pc <- readr::read_tsv(paste0(correctPC)) %>%
+        tibble::column_to_rownames(var = "#IID") %>% 
+        dplyr::select(tidyselect::all_of(1:nPC))
+    }
+   
     # Handle NA values -----------------------------------------------------
     if (any(is.na(gen))) {
       stop("Missing values found in gen data")
     }
     
     if (any(is.na(env))) {
-      warning("Missing values found in env data, removing rows with NAs")
-      na_env <- env
-      gen <- gen[complete.cases(na_env), ]
-      pc <- pc[complete.cases(na_env), ]
-      # Must come last
-      env <- env[complete.cases(na_env), ]
-      if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
+      if (!is.null(correctPC)) {
+        warning("Missing values found in env data, removing rows with NAs")
+        na_env <- env
+        gen <- gen[complete.cases(na_env), ]
+        pc <- pc[complete.cases(na_env), ]
+        # Must come last
+        env <- env[complete.cases(na_env), ]
+        if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
+        # Check env var naming ----------------------------------------------------
+        if(any(colnames(pc) %in% colnames(env))) {
+        colnames(env) <- paste(colnames(env), "_env", sep = "")
+        warning("env names should differ from PC1, PC2, etc if correctPC is TRUE. Appending 'env' to env names")
+    }
+      }
+      if (is.null(correctPC)) {
+        warning("Missing values found in env data, removing rows with NAs")
+        na_env <- env
+        gen <- gen[complete.cases(na_env), ]
+        # Must come last
+        env <- env[complete.cases(na_env), ]
+        if (!is.null(coords)) coords <- coords[complete.cases(na_env), ]
+      }
     }
     
     # Set up model ------------------------------------------------------------
-    # Check env var naming ----------------------------------------------------
-    if(any(colnames(pc) %in% colnames(env))) {
-      colnames(env) <- paste(colnames(env), "_env", sep = "")
-      warning("env names should differ from PC1, PC2, etc if correctPC is TRUE. Appending 'env' to env names")
-    }
     print(paste0("env object has ", nrow(env), " rows"))
-    print(paste0("pc object has ", nrow(pc), " rows"))
+    # print(paste0("pc object has ", nrow(pc), " rows"))
     print(paste0("gen object has ", nrow(gen), " rows"))
     
-    moddf <- data.frame(env, pc)
-    f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
+    if (is.null(correctPC)) {
+      moddf <- data.frame(env)
+      f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+")))
+    }
+    
+    if (!is.null(correctPC)) {
+      moddf <- data.frame(env, pc)
+      f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
+    }
     
     mod <- vegan::rda(f, data = moddf)
     return(list(gen = gen, mod = mod, env = env))
