@@ -240,7 +240,8 @@ rule algatr_RDA:
         impute = "simple",
         kvals = "1:10",
         correctGEO = "false",
-        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        # correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        correctPC = "NULL",
         nPC = 10,
         model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
         sig = 0.01, # only for outlier_method = "p"
