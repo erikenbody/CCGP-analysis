@@ -2,91 +2,64 @@
 
 #' Import, process, and check gen objects and coordinates
 #' 
-#' TODO: eventually coords won't be pulled from the QC dir but rather the spreadsheet
+#' TODO: eventually coords will be pulled from the CCGP-module directory
+#' TODO add land_type to this function to specify env layers to gather for analyses
 #' 
 #' @param species species, including project ID (e.g., "41-Chamaea)
 #' @param data_path path to raw data files
-#' @param analysis type of gen object required as input into given analysis: "gendist" (default; for GDM, MMRR) or "vcf" (for wingen, RDA, LFMM, TESS)
-#' @param pruned whether to retrieve LD-pruned data (TRUE; default) or not (FALSE)
-#' @param impute if `analysis = "vcf"`, whether to impute missing values based on simple median-based imputation ("simple"), structure-based using sNMF ("structure") or no imputation ("none"; default)
-#' @param kvals if `analysis = "vcf"` and `impute = "structure"`, integer vector corresponding to the number of ancestral populations for which the sNMF algorithm estimates have to be calculated
-#' @param save_impute if `impute`, export imputed genotypes (defaults to FALSE)
-#' @param incl_env whether to retrieve envlayers (defaults to TRUE)
+#' @param analysis type of gen object required as input into given analysis: "vcf" (default; for wingen, RDA, LFMM, TESS) or "gendist" (for GDM, MMRR)
+#' @param impute if `analysis = "vcf"`, whether to impute missing values based on simple median-based imputation ("simple") or no imputation ("none"; default)
 #' @param rmislands whether to remove islands (TRUE; default) or not (FALSE) depending on project's sampling
 #' @param intervals boolean whether the analysis is running per contig or for the genome
 #' @param scaff if intervals, which scaffold is being run
+#' @param save_impute if `impute`, export imputed genotypes (defaults to FALSE)
+#' @param incl_env whether to retrieve envlayers (defaults to TRUE)
+#' @param env_var_type if `incl_env = TRUE`, type of environmental variables to gather; options are "rasterpcs" (default) or "bio1ndvi"
+#' @param vcf_path path to vcf or gendist file
+#' @param coords path to sampling coordinates
+#' @param land_type if `env_var_type = "rasterpcs"`, landscape type for env layers; options are "terrestrial" (default) or "marine"
+#' 
 #'
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
-get_input_objects <- function(species, data_path, analysis = "gendist", pruned = TRUE, impute = "none", 
-  kvals = NULL, rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, incl_env = TRUE, vcf_path, coords) {
-  
+get_input_objects <- function(species, data_path, analysis = "gendist", impute = "none", 
+                              rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, 
+                              incl_env = TRUE, env_var_type = "rasterpcs", vcf_path, coords, land_type = "terrestrial") {
   # Get coords --------------------------------------------------------------
-
-  #coords <- readr::read_tsv(paste0(data_path, "algatr/", species, ".coords.txt", sep = ""), col_names = FALSE)
-  coords <- readr::read_tsv(coords, col_names = FALSE)
-  colnames(coords) <- c("INDV", "x", "y")
-  coords$x <- as.numeric(coords$x)
-  coords$y <- as.numeric(coords$y)
+  coords <- readr::read_tsv(coords, col_names = c("INDV", "x", "y"))
 
   # Get input data ----------------------------------------------------------
-  if (analysis == "gendist") {
-    if (!pruned) {
-      dist = paste0(data_path, "CCGP/", species, "_filtered.dist", sep = "")
-      dist_id = paste0(data_path, "CCGP/", species, "_filtered.dist.id", sep = "")
-    }
-    if (pruned) {
-      dist = paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.dist", sep = "")
-      dist_id = paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.dist.id", sep = "")
-    }
-    # Process dists using algatr
-    gen <- algatr::gen_dist(dist_type = "plink", plink_file = dist, plink_id_file = dist_id)
-  }
-  
   if (analysis == "vcf") {
-      gen <- vcfR::read.vcfR(vcf_path)
-
-    # if (!pruned) {
-    #   if (!intervals){
-    #     gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
-    #   }
-    #   if (intervals){
-    #     #gen <- vcfR::read.vcfR(paste0(data_path, "algatr/subsets/", species, "_", scaff, "_annotated.vcf.gz"))
-    #     gen <- vcfR::read.vcfR(paste0(data_path, "algatr/subsets/", species, "_", scaff, "_annotated_pruned_0.6.vcf.gz"))
-    #   }
-    # }
-    # if (pruned) {
-    #   #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated.vcf.gz"))
-    #   #gen <- vcfR::read.vcfR(paste0(data_path, "CCGP/", species, "_annotated_pruned_0.6.vcf.gz"))
-    #   #use this to test out, much smaller file
-    #   #gen <- vcfR::read.vcfR(paste0(data_path, "QC/", species, ".pruned.vcf.gz"))
-    #   gen <- vcfR::read.vcfR(paste0(data_path, "algatr/", species, "_complete_coords_pruned_0.6.vcf.gz"))
-    # }
+    gen <- vcfR::read.vcfR(vcf_path)
     if (impute == "simple") {
       gen <- algatr::vcf_to_dosage(gen)
       gen <- algatr::simple_impute(x = gen, FUN = median)
     }
-    if (impute == "structure") gen <- algatr::str_impute(gen = gen, K = kvals) # N.B.: output is a dosage matrix, not a vcfR object
+  }
+  if (analysis == "gendist") {
+    dist_id = paste0(vcf_path, ".id")
+    # Process dists using algatr
+    gen <- algatr::gen_dist(dist_type = "plink", plink_file = vcf_path, plink_id_file = dist_id)
   }
   
   # Check coords and gendist IDs --------------------------------------------
-
-  # Filter gen object to include only individuals present in coords$INDV
-  # genID <- colnames(gen@gt[, -1])
-  # gen <- gen[, genID %in% coords$INDV]
-  # print(gen)
-  # print(gen[,"_E0044B"])
-
   dat <- check_ccgp_data(gen = gen, coords = coords, filetype = analysis)
   
   # Get envlayers -----------------------------------------------------------
   if (incl_env) {
-    env <- get_envlayers(env_path = snakemake@params[[21]], shape_path = snakemake@params[[23]], layers = snakemake@params[[22]], rmislands = rmislands)
+    env <- get_envlayers(env_var_type = snakemake@params[[19]], 
+                         shape_path = snakemake@params[[20]], 
+                         rmislands = rmislands,
+                         land_type = land_type)
+    # env <- get_envlayers(env_path = snakemake@params[[21]], 
+    #                      shape_path = snakemake@params[[23]], 
+    #                      layers = snakemake@params[[22]], 
+    #                      rmislands = rmislands,
+    #                      land_type = land_type)
     #env <- get_envlayers(env_path = "/scratch2/erik/CCGP-reruns/data/", rmislands = rmislands)
   } else {
     env <- NULL
   }
-  
   return(list(gen = gen, coords = dat$coords, sampleIDs = dat$sampleIDs, envlayers = env))
 }
 
@@ -94,6 +67,8 @@ get_input_objects <- function(species, data_path, analysis = "gendist", pruned =
 #' checks ordering of samples within each of those. If genetic data are missing
 #' for coordinates, removes those samples and outputs new coords file that's corrected.
 #' If missing coords for samples, function will stop.
+#' 
+#' TODO extrapolate any NA values from nearby samples within a given radius?
 #'
 #' @param gen genetic data
 #' @param coords sampling coordinates
@@ -139,45 +114,48 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 }
 
 #' Get PC envlayers and remove islands; requires env_path/PC_layers and env_path/CA_State
-#'
-#' @param env_path path to environmental layers (max of 2 accepted; first will be used to standardize extent and resolution)
-#' @param shape_path path to shapefile
-#' @param layers names of layers to be retained in raster stack; options are "all" (for all layers in tif; default) or list of names
+#' 
+#' TODO remove samples that fall outside California / marine boundaries?
+#' 
+#' @param env_var_type type of env vars desired; options are "rasterpcs" or "bio1ndvi"
 #' @param rmislands whether to remove islands or not
+#' @param shape_path if `rmislands = TRUE`, path to shapefile
+#' @param land_type if `env_var_type = "rasterpcs"`, landscape type for env layers; options are "terrestrial" (default) or "marine"
 #'
 #' @return envlayers
 #' @export
-get_envlayers <- function(env_path, shape_path, layers = "all", rmislands = FALSE) {
-  if (length(env_path) == 1) {
-    # Get env layers
-    # envlayers <- raster::stack(env_path)
-    envlayers <- raster::stack(paste0(snakemake@scriptdir, env_path))
+get_envlayers <- function(env_var_type, rmislands, shape_path, land_type) {
+  if (env_var_type == "rasterpcs") {
+    if (land_type == "terrestrial") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif"))
+    # if (land_type == "marine") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/XXX_pca.tif"))
   }
 
-  if (length(env_path) == 2) {
-    # env1 <- raster::stack(env_path[[1]])
-    # env2 <- raster::stack(env_path[[2]])
-    env1 <- raster::stack(paste0(snakemake@scriptdir, env_path[[1]]))
-    env2 <- raster::stack(paste0(snakemake@scriptdir, env_path[[2]]))
-
-    # Match extents so they can be combined
-    env2 <- terra::resample(terra::rast(env2), terra::rast(env1))
-
-    # Combine into single raster stack
-    envlayers <- raster::stack(env1, raster::stack(env2))
+  if (env_var_type == "bio1ndvi") {
+    all_bio <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif"))
+    # Extract only BIO1
+    bio1 <- terra::subset(all_bio, "CHELSA_bio1_1981-2010_V.2.1")
+    # Import NDVI layer
+    ndvi <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_ndvi_mean_2000_2020.tif"))
+    ndvi <- terra::resample(ndvi, bio1)
+    envlayers <- c(bio1, ndvi)
+    # Can do checks like crs(), ext(), or res() to ensure layers match
   }
-
-  # Subset particular layers of env object if so desired
-  if (all(layers != "all")) envlayers <- raster::subset(x = envlayers, subset = layers)
 
   print(summary(envlayers))
   
-  # Shape file of region of interest
-  spdf <- rgdal::readOGR(paste0(snakemake@scriptdir, shape_path))
-  boundary <- sp::spTransform(spdf, raster::crs("+proj=longlat +datum=WGS84 +no_defs"))
-  
-  # Remove islands
-  if(rmislands == TRUE) envlayers <- algatr::rm_islands(envlayers, boundary)
+  # Remove islands; requires rmapshaper package
+  # TODO get rid of rgdal
+  if(rmislands == TRUE) {
+    # Shape file of region of interest
+    # states <- tigris::states(cb = TRUE)
+    # ca <- states[states$STUSPS == "CA", "STUSPS"]
+    # ca <- sf::st_transform(ca, sf::st_crs(4326))
+    # ca <- sf::st_read(shape_path)
+    # ca <- sf::st_as_sf(ca, crs = st_crs(4326))
+    spdf <- rgdal::readOGR(paste0(snakemake@scriptdir, shape_path))
+    boundary <- sp::spTransform(spdf, raster::crs("+proj=longlat +datum=WGS84 +no_defs"))
+    envlayers <- algatr::rm_islands(envlayers, ca)
+  }
   
   return(envlayers)
 }
@@ -199,14 +177,17 @@ coords_to_df <- function(coords) {
 #'
 #' @param coords sampling coordinates, in latitude/longitude degrees
 #' @param env RasterStack of envlayers to be reprojected
+#' @param newcrs CRS to reproject data to (defaults to 3310)
 #'
 #' @return reprojected coords
 #' @export
-reproject <- function(coords, env) {
+reproject <- function(coords, env, newcrs = 3310) {
   latlong <- sf::st_as_sf(coords, coords = c("x", "y"), crs = "+proj=longlat")
-  coords_proj <- sf::st_transform(latlong, crs = 3310)
+  coords_proj <- sf::st_transform(latlong, crs = newcrs)
   
-  if (!is.null(env)) env_proj <- raster::projectRaster(env, crs = 3310)
+  # TODO convert to terra package
+  # if (!is.null(env)) env_proj <- terra::projectRaster(env, crs = newcrs)
+  if (!is.null(env)) env_proj <- raster::projectRaster(env, crs = newcrs)
   if (is.null(env)) env_proj <- NULL
   
   return(list(coords_proj = coords_proj, env_proj = env_proj))
