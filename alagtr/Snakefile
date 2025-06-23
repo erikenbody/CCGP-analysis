@@ -219,6 +219,8 @@ rule algatr_separate_vcf_ld06:
          bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}
          """
 
+# TODO python function for env layers if land_type = marine or terrestrial
+
 rule algatr_RDA:
     """
     call algatr RDA 
@@ -235,12 +237,12 @@ rule algatr_RDA:
         species = config['final_prefix'],
         data_path = "results/{refGenome}/",
         output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
-        rmislands = "false",
+        rmislands = "true",
         impute = "simple",
         correctGEO = "false",
         correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
         # correctPC = "NULL",
-        nPC = 10,
+        nPC = 3,
         model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
         sig = 0.01, # only for outlier_method = "p"
         z = 3, # only for outlier_method = "z"
@@ -249,10 +251,12 @@ rule algatr_RDA:
         R2scope = "true",
         p_adj = "fdr", # only if outlier_method = "p"
         save_impute = "true",
+        # intervals = "false",
+        # scaff = "NA",
         intervals = "true",
         scaff = "{scaff}",
         env_var_type = "rasterpcs", # "rasterpcs" or "bio1ndvi"
-        shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp",
+        shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only if rmislands=TRUE
         land_type = "terrestrial"
         ## For three raster PCs
         # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
