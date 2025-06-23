@@ -4,6 +4,7 @@ rule basic_filter:
     """
     Filters a vcf file to remove samples marked exclude, sites that don't pass filters,
     sites with reference equal to N or alt equal to ., and sites with AF == 0.
+    Note even tho it says "include" the list is actually a list of samples to exclude.
     """
     input: 
         vcf = ancient("results/{refGenome}/{prefix}_raw.vcf.gz"),
