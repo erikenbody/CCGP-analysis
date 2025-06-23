@@ -236,12 +236,10 @@ rule algatr_RDA:
         data_path = "results/{refGenome}/",
         output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
         rmislands = "false",
-        pruned = "false",
         impute = "simple",
-        kvals = "1:10",
         correctGEO = "false",
-        # correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        correctPC = "NULL",
+        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        # correctPC = "NULL",
         nPC = 10,
         model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
         sig = 0.01, # only for outlier_method = "p"
@@ -253,16 +251,15 @@ rule algatr_RDA:
         save_impute = "true",
         intervals = "true",
         scaff = "{scaff}",
-        ## For raster PCs (3 env vars)
+        env_var_type = "rasterpcs", # "rasterpcs" or "bio1ndvi"
+        shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp",
+        land_type = "terrestrial"
+        ## For three raster PCs
         # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
         # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
-        ## For only BIO1
-        # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", # raw envlayers
-        # layers = "CHELSA_bio1_1981.2010_V.2.1"
         ## For BIO1 + NDVI
-        env_path = ["/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to envlayers
-        layers = ["CHELSA_bio1_1981.2010_V.2.1", "NDVI"],
-        shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp"
+        # env_path = ["/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
+        # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
     log:
