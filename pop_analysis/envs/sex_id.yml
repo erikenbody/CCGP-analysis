@@ -1,0 +1,14 @@
+name: sex_id
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9
+  - pysam
+  - pandas
+  - numpy
+  - scikit-learn
+  - statsmodels
+  - matplotlib
+  - seaborn

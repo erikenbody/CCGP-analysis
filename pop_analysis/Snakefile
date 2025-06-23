@@ -21,15 +21,15 @@ def get_k(wc):
         *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/pi_population_{k}.csv", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_population_pi/het_population_{k}.csv", **wc, k=k_values),
         *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh", **wc, k=k_values),
+        
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_hom_count.txt",**wc, k=k_values),
-
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{variant}_{k}.MAF", variant=["deleterious", "synonymous", "tolerated", "nonsynonymous"], **wc, k=k_values),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}.rxy", **wc, k=k_values)
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_hom_count.txt", **wc, k=k_values),
 
-        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_seed_{seed}.png", **wc, k=k_values, seed = seeds),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
-        # *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz", **wc, k=k_values, seed = seeds),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_clam/pop_{k}_clam_summary.tsv", **wc, k=k_values),
+        #*expand("results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_het.tsv", **wc, k=k_values),
     ]
     
     return out
@@ -38,6 +38,44 @@ rule pop_get_k_files:
     # dummy rule to get all of the files split by k pops
     input: get_k
     output: touch("results/{refGenome}/pop_analysis/{prefix}_k.done")
+
+rule extract_vcf_data_for_sex_id:
+    """
+    Uses bcftools to rapidly extract CHROM, SAMPLE, DP, and GT fields from the VCF.
+    """
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+        vcf_index = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi"
+    output:
+        raw_data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_raw_data.tsv.gz"
+    params:
+        query_format = r'[%CHROM\t%SAMPLE\t%DP\t%GT\n]'
+    conda:
+        "envs/roh.yml"
+    log:
+        "logs/{refGenome}/identify_sex_chromosomes/{prefix}.extract.log"
+    shell:
+        "bcftools query -f '{params.query_format}' {input.vcf} | gzip > {output.raw_data} 2> {log}"
+
+rule analyze_sex_data:
+    """
+    This script reads the simple TSV file, calculates normalized depth and heterozygosity,
+    performs clustering, and generates reports and plots.
+    """
+    input:
+        raw_data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_raw_data.tsv.gz",
+        vcf_path_for_lengths = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"
+    output:
+        report = "results/{refGenome}/pop_analysis/sex_id/{prefix}_sex_chromosome_candidates.csv",
+        data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_depth_heterozygosity.csv",
+        plot = "results/{refGenome}/pop_analysis/sex_id/{prefix}_chromosome_depth_heterozygosity.png",
+        exclude_scaffolds = "results/{refGenome}/pop_analysis/sex_id/{prefix}_exclude_scaffolds.txt"
+    conda:
+        "envs/sex_id.yml"
+    log:
+        "logs/{refGenome}/identify_sex_chromosomes/{prefix}.analyze.log"
+    script:
+        "scripts/identify_sex_linked_scaffolds.py"
 
 rule get_GONE_contigs:
     input:
@@ -247,7 +285,7 @@ rule pop_plink_bed_pops:
     '''
     input:
         subsamp = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz",
-        indel_absent_vcf = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz",
+        #indel_absent_vcf = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz",
     output:
         plink_bed = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink.bed",
         plink_map_temp = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink_ORIG.map",
@@ -258,7 +296,7 @@ rule pop_plink_bed_pops:
         "envs/plink1_9.yml"
     shell:
         '''
-        plink --vcf {input.indel_absent_vcf} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
+        plink --vcf {input.subsamp} --out {params.plink_out} --double-id --make-bed --allow-extra-chr
         plink --bfile {params.plink_out} --recode --out {params.plink_out} --allow-extra-chr
         mv {params.plink_out}.map {output.plink_map_temp}
         '''
@@ -306,6 +344,7 @@ rule GONE:
         cp {input.ped} {params.GONE_dir}
 
         cd {params.GONE_dir} 
+        sed -i 's/^threads=-99/threads=10/' INPUT_PARAMETERS_FILE
         bash script_GONE.sh {params.ccgp_id}
 
         mv O*{params.ccgp_id} ../../
@@ -335,7 +374,8 @@ rule pop_plot_all_seeds:
     input:
         GONE_out_Ne = get_all_GONE_out_Ne
     output:
-        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png"
+        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png",
+        GONE_avg_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds_V2.png"
     params:
         project_id = "{prefix}",
         population_id = "{k}",
@@ -511,4 +551,93 @@ rule calc_rxy:
         "envs/pie.yml"
     script:
         "scripts/calc_Rxy.R"
-    
+
+#clam
+rule setup_clam:
+    input:
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        roh_file = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh",
+        pop_samps = "results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt"
+    output:
+        roh_gz = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz",
+        roh_tbi = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz.tbi",
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.tbi",
+        pop_samps = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_samps.txt",
+    params:
+        roh_sort = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh",
+    conda:
+        "envs/clam.yml"
+    shell:
+        """
+        sort -k1,1 -k2,2n {input.roh_file} > {params.roh_sort}
+        bgzip -c {params.roh_sort} > {output.roh_gz}
+        tabix -p bed {output.roh_gz}
+        
+        tabix {input.vcf}
+
+        awk '{{print $0 "\tpop1"}}' {input.pop_samps} > {output.pop_samps}
+        """
+
+rule clam_loci:
+    input:
+        d4 = "results/{refGenome}/all_samples.d4",
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        clam = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz",
+        roh_tbi = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz.tbi",
+        vcf_tbi = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.tbi",
+        pop_samps = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_samps.txt",
+    output:
+        d4_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/callable_sites.d4",
+    conda:
+        "envs/clam.yml"
+    params:
+        lower = 2,
+        upper = 100,
+        clam_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}"
+    shell:
+        """
+        clam loci --merged -p {input.pop_samps} -m {params.lower} -M {params.upper} -o {params.clam_out} {input.d4}
+        """
+
+rule clam_stat:        
+    input:
+        clam = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/callable_sites.d4",
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+        roh_file = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz",
+        roh_idx = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_sorted.rg.roh.gz.tbi",
+        pop_samps = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_samps.txt",
+    output:
+        pi_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_outside_roh/clam_pi.tsv",
+        het_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_outside_roh/clam_het.tsv",
+        pi_out2 = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_pi.tsv",
+        het_out2 = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_het.tsv",
+    conda:
+        "envs/clam.yml"
+    params:
+        window = 50000,
+        clam_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_outside_roh",
+        clam_out2 = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}"
+    resources:
+        threads = 10
+    shell:
+        """
+        clam stat -p {input.pop_samps} -t {threads} -w {params.window} --roh-file {input.roh_file} -o {params.clam_out} {input.vcf} {input.clam}
+        clam stat -p {input.pop_samps} -t {threads} -w {params.window} -o {params.clam_out2} {input.vcf} {input.clam}
+        """
+
+rule summarize_clam_stats:
+    input:
+        pi_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_outside_roh/clam_pi.tsv",
+        het_out = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}_outside_roh/clam_het.tsv",
+        pi_out2 = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_pi.tsv",
+        het_out2 = "results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_het.tsv",
+    conda:
+        "envs/roh.yml" #has pandas
+    params:
+        k = "{k}"
+    output:
+        summary = "results/{refGenome}/pop_analysis/{prefix}_clam/pop_{k}_clam_summary.tsv"
+    conda:
+        "envs/clam.yml"
+    script:
+        "scripts/summarize_clam_stats.py"
