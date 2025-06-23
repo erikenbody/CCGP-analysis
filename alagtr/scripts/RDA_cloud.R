@@ -1,13 +1,13 @@
 suppressMessages({
   library(tidyverse)
   library(raster)
+  # library(terra)
   library(vegan)
   library(qvalue)
   library(peakRAM)
   library(here)
   library(devtools)
   library(algatr)
-  library(purrr)
 })
 
 # # example call: `Rscript RDA_cloud.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" "outputs/RDA/" FALSE FALSE "structure" 1:5 FALSE FALSE 3 "best" 0.01 3 0.05 1000 TRUE "fdr"`
@@ -32,31 +32,26 @@ species = snakemake@params[[1]]
 data_path = snakemake@params[[2]]
 output_path = snakemake@params[[3]]
 rmislands = as.logical(snakemake@params[[4]])
-pruned = as.logical(snakemake@params[[5]])
-impute = snakemake@params[[6]]
-kvals = snakemake@params[[7]] # no longer used
-correctGEO = as.logical(snakemake@params[[8]])
-correctPC = snakemake@params[[9]]
-nPC = snakemake@params[[10]]
-model = snakemake@params[[11]]
-sig = snakemake@params[[12]] # only for outlier_method = "p"
-z = snakemake@params[[13]]# only for outlier_method = "z"
-Pin = snakemake@params[[14]]
-R2permutations = snakemake@params[[15]]
-R2scope = as.logical(snakemake@params[[16]])
-p_adj = snakemake@params[[17]] # only if outlier_method = "p"
-save_impute = as.logical(snakemake@params[[18]])
-intervals = as.logical(snakemake@params[[19]])
-scaff = as.character(snakemake@params[[20]])
-env_path = as.character(snakemake@params[[21]])
-layers = as.character(snakemake@params[[22]])
-shape_path = as.character(snakemake@params[[23]])
+impute = snakemake@params[[5]]
+correctGEO = as.logical(snakemake@params[[6]])
+correctPC = snakemake@params[[7]]
+nPC = snakemake@params[[8]]
+model = snakemake@params[[9]]
+sig = snakemake@params[[10]] # only for outlier_method = "p"
+z = snakemake@params[[11]]# only for outlier_method = "z"
+Pin = snakemake@params[[12]]
+R2permutations = snakemake@params[[13]]
+R2scope = as.logical(snakemake@params[[14]])
+p_adj = snakemake@params[[15]] # only if outlier_method = "p"
+save_impute = as.logical(snakemake@params[[16]])
+intervals = as.logical(snakemake@params[[17]])
+scaff = as.character(snakemake@params[[18]])
+env_var_type = as.character(snakemake@params[[19]])
+shape_path = as.character(snakemake@params[[20]])
+land_type = as.character(snakemake@params[[21]])
+
 coords = snakemake@input[["coords"]]
 vcf = snakemake@input[["vcf"]]
-
-#need to interpret the kvals string as an expression
-kvals <- try(eval(parse(text = kvals)), silent = TRUE)
-#kvals <- 1:3
 
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
@@ -66,16 +61,17 @@ peakRAM_imp <-
     dat <- get_input_objects(species = species, 
                              data_path = data_path,
                              analysis = "vcf",
-                             pruned = pruned,
+                            #  pruned = pruned,
                              impute = impute,
-                             kvals = kvals,
                              rmislands = rmislands,
                              save_impute = FALSE, # save this for later
                              intervals = intervals,
                              scaff = scaff,
-                             vcf_path =vcf,
-                             coords = coords)
-    
+                             incl_env = TRUE,
+                             env_var_type = env_var_type,
+                             vcf_path = vcf,
+                             coords = coords,
+                             land_type = land_type)
   )
 
 # Explicit outputs --------------------------------------------------------
