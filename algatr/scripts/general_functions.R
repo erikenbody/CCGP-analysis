@@ -3,7 +3,6 @@
 #' Import, process, and check gen objects and coordinates
 #' 
 #' TODO: eventually coords will be pulled from the CCGP-module directory
-#' TODO add land_type to this function to specify env layers to gather for analyses
 #' 
 #' @param species species, including project ID (e.g., "41-Chamaea)
 #' @param data_path path to raw data files
@@ -18,13 +17,15 @@
 #' @param vcf_path path to vcf or gendist file
 #' @param coords path to sampling coordinates
 #' @param land_type if `env_var_type = "rasterpcs"`, landscape type for env layers; options are "terrestrial" (default) or "marine"
+#' @param shape_path if `rmislands = TRUE`, path to shapefile that excludes Channel Islands
 #' 
 #'
 #' @return list with genetic data and coordinates (in same order and matched samples)
 #' @export
 get_input_objects <- function(species, data_path, analysis = "gendist", impute = "none", 
                               rmislands = TRUE, intervals = FALSE, scaff = NA, save_impute = FALSE, 
-                              incl_env = TRUE, env_var_type = "rasterpcs", vcf_path, coords, land_type = "terrestrial") {
+                              incl_env = TRUE, env_var_type = "rasterpcs", vcf_path, coords, 
+                              land_type = "terrestrial", shape_path) {
   # Get coords --------------------------------------------------------------
   coords <- readr::read_tsv(coords, col_names = c("INDV", "x", "y"))
 
@@ -47,20 +48,14 @@ get_input_objects <- function(species, data_path, analysis = "gendist", impute =
   
   # Get envlayers -----------------------------------------------------------
   if (incl_env) {
-    env <- get_envlayers(env_var_type = snakemake@params[[19]], 
-                         shape_path = snakemake@params[[20]], 
+    envlayers <- get_envlayers(env_var_type = env_var_type, 
+                         shape_path = shape_path, 
                          rmislands = rmislands,
                          land_type = land_type)
-    # env <- get_envlayers(env_path = snakemake@params[[21]], 
-    #                      shape_path = snakemake@params[[23]], 
-    #                      layers = snakemake@params[[22]], 
-    #                      rmislands = rmislands,
-    #                      land_type = land_type)
-    #env <- get_envlayers(env_path = "/scratch2/erik/CCGP-reruns/data/", rmislands = rmislands)
   } else {
-    env <- NULL
+    envlayers <- NULL
   }
-  return(list(gen = gen, coords = dat$coords, sampleIDs = dat$sampleIDs, envlayers = env))
+  return(list(gen = gen, coords = dat$coords, sampleIDs = dat$sampleIDs, envlayers = envlayers))
 }
 
 #' Checks sample IDs from coordinates against those of genetic data file; also
@@ -68,7 +63,6 @@ get_input_objects <- function(species, data_path, analysis = "gendist", impute =
 #' for coordinates, removes those samples and outputs new coords file that's corrected.
 #' If missing coords for samples, function will stop.
 #' 
-#' TODO extrapolate any NA values from nearby samples within a given radius?
 #'
 #' @param gen genetic data
 #' @param coords sampling coordinates
@@ -115,46 +109,41 @@ check_ccgp_data <- function(gen, coords, filetype = "gendist"){
 
 #' Get PC envlayers and remove islands; requires env_path/PC_layers and env_path/CA_State
 #' 
-#' TODO remove samples that fall outside California / marine boundaries?
 #' 
 #' @param env_var_type type of env vars desired; options are "rasterpcs" or "bio1ndvi"
-#' @param rmislands whether to remove islands or not
 #' @param shape_path if `rmislands = TRUE`, path to shapefile
 #' @param land_type if `env_var_type = "rasterpcs"`, landscape type for env layers; options are "terrestrial" (default) or "marine"
+#' @param rmislands if `land_type = "terrestrial"`, whether to remove islands or not
 #'
 #' @return envlayers
 #' @export
-get_envlayers <- function(env_var_type, rmislands, shape_path, land_type) {
+get_envlayers <- function(env_var_type, shape_path, land_type, rmislands) {
   if (env_var_type == "rasterpcs") {
-    if (land_type == "terrestrial") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif"))
-    # if (land_type == "marine") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/XXX_pca.tif"))
+    if (land_type == "terrestrial") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif"))
+    if (land_type == "marine") envlayers <- terra::rast(paste0(snakemake@scriptdir, "/../../data/env/biooracle_V3_2000-2010_pca.tif"))
+    names(envlayers) <- paste("env_", names(envlayers), sep = "")
   }
 
-  if (env_var_type == "bio1ndvi") {
-    all_bio <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif"))
+  if (env_var_type == "bio1ndvi" & land_type == "terrestrial") {
+    all_bio <- terra::rast(paste0(snakemake@scriptdir, "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1.tif"))
     # Extract only BIO1
     bio1 <- terra::subset(all_bio, "CHELSA_bio1_1981-2010_V.2.1")
     # Import NDVI layer
-    ndvi <- terra::rast(paste0(snakemake@scriptdir, "/../../data/california_ndvi_mean_2000_2020.tif"))
+    ndvi <- terra::rast(paste0(snakemake@scriptdir, "/../../data/env/california_ndvi_mean_2000_2020.tif"))
     ndvi <- terra::resample(ndvi, bio1)
     envlayers <- c(bio1, ndvi)
-    # Can do checks like crs(), ext(), or res() to ensure layers match
+    # Can do checks like compareGeom(), crs(), ext(), or res() to ensure layers match
   }
 
   print(summary(envlayers))
   
-  # Remove islands; requires rmapshaper package
-  # TODO get rid of rgdal
-  if(rmislands == TRUE) {
-    # Shape file of region of interest
-    # states <- tigris::states(cb = TRUE)
-    # ca <- states[states$STUSPS == "CA", "STUSPS"]
-    # ca <- sf::st_transform(ca, sf::st_crs(4326))
-    # ca <- sf::st_read(shape_path)
-    # ca <- sf::st_as_sf(ca, crs = st_crs(4326))
-    spdf <- rgdal::readOGR(paste0(snakemake@scriptdir, shape_path))
-    boundary <- sp::spTransform(spdf, raster::crs("+proj=longlat +datum=WGS84 +no_defs"))
-    envlayers <- algatr::rm_islands(envlayers, ca)
+  # Remove Channel Islands using custom shapefile
+  if (rmislands == TRUE & land_type == "terrestrial") {
+    ca_noislands <- sf::st_read(paste0(snakemake@scriptdir, shape_path))
+    # ca_noislands <- sf::st_read(shape_path)
+    ca_noislands <- sf::st_as_sf(ca_noislands, crs = sf::st_crs(envlayers))
+    ca_noislands <- sf::st_transform(ca_noislands, sf::st_crs(envlayers))
+    envlayers <- terra::mask(envlayers, ca_noislands)
   }
   
   return(envlayers)
@@ -186,7 +175,7 @@ reproject <- function(coords, env, newcrs = 3310) {
   coords_proj <- sf::st_transform(latlong, crs = newcrs)
   
   # TODO convert to terra package
-  # if (!is.null(env)) env_proj <- terra::projectRaster(env, crs = newcrs)
+  # if (!is.null(env)) env_proj <- terra::project(env, crs = newcrs)
   if (!is.null(env)) env_proj <- raster::projectRaster(env, crs = newcrs)
   if (is.null(env)) env_proj <- NULL
   

@@ -1,9 +1,0 @@
-name: admixture
-channels:
-  - bioconda
-  - conda-forge
-  - defaults
-dependencies:
-  - plink==1.90b6.21
-  - python=3.8
-  - admixture==1.3.0
