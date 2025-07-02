@@ -1,0 +1,678 @@
+from pathlib import Path
+
+
+rule algatr_env:
+    """
+    Its a bit tricky to get this env setup so moving the installation to here
+    """
+    input: 
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+    output:
+        "results/{refGenome}/algatr/{prefix}_env_created.txt"
+    conda:
+        "envs/algatr.yml"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_env_creation.txt"
+    script:
+        "scripts/setup_algatr_env.R"
+
+# rule algatr_get_vcf_samples:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#     output:
+#         samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         "bcftools query -l {input.vcf} > {output.samps}"
+
+# rule algatr_create_coords_sheet:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         samps = "results/{refGenome}/algatr/{prefix}.samps4coords.txt"
+#     output:
+#         samps_w_coord = "results/{refGenome}/algatr/{prefix}.coords.txt",
+#         exclude_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     conda:
+#         "envs/mongo.yml"
+#     params:
+#         project_id = "{prefix}",
+#         ref_genome = "{refGenome}",
+#         sample_id = config["sample_id"]
+#     script:
+#         "scripts/create_coord_sheet_revised.py"
+
+# rule algatr_remove_samps_no_coords:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
+        
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {input.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
+
+# rule algatr_remove_samps_no_coords_full:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {input.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
+
+# rule algatr_remove_samps_no_coords_ld06:
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+#         excluded_samps = "results/{refGenome}/algatr/{prefix}.no_coords.txt"
+#     output:
+#         filtered_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+#         filtidx_no_coords = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+#         vcfidx = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
+#     conda:
+#         "envs/bcftools.yml"
+#     shell:
+#         """
+#         bcftools index {input.vcf}
+#         if [ ! -s {input.excluded_samps} ]; then
+#             cp {input.vcf} {output.filtered_no_coords}
+#             cp {output.vcfidx} {output.filtidx_no_coords}
+#         else
+#             bcftools view -S ^{input.excluded_samps} -f .,PASS {input.vcf} -a -U -O u | bcftools +fill-tags -Ou |
+#             bcftools view -m2 -e 'AF==0 | ref="N" | ALT="."' -O z -o {output.filtered_no_coords}
+#             bcftools index {output.filtered_no_coords}
+#         fi
+#         """
+
+rule algatr_plink_pca:
+    """
+    Call plink PCA. Needed for input to RDA analysis
+    """
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+        #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+    params:
+        prefix = "results/{refGenome}/algatr/{prefix}"
+    output: 
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        eigenval = "results/{refGenome}/algatr/{prefix}.eigenval",
+    conda:
+        "envs/plink.yml"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    shell:
+        """
+        plink2 --vcf {input.vcf} --pca 10 --out {params.prefix} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
+        """
+        
+rule algatr_tess:
+    """
+    call algatr tess 
+    """
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+        vcf_idx = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz.csi",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt" 
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        rmislands = "true",
+        kvals = "1:10",
+        output_path = "results/{refGenome}/algatr/",
+        incl_env = "false"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        "logs/{refGenome}/algatr/{prefix}_tess.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/{prefix}_TESS.benchmark.txt",
+    output: 
+    # Exported files are as follows:
+        tess1 = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        #tess3 = "results/{refGenome}/algatr/{prefix}_TESS_bestK_krigadmix.tif",
+        tess4 = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
+        tess5 = "results/{refGenome}/algatr/{prefix}_TESS_peakRAM.csv",
+        tess6 = "results/{refGenome}/algatr/{prefix}_TESS_xval.png"
+    conda:
+        "envs/algatr.yml"
+    script:
+        "scripts/TESS_cloud.R" 
+
+rule algatr_pieplot:
+    input:
+        tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt" 
+    params:
+        species = config['final_prefix'],
+    output:
+        plot = "results/{refGenome}/algatr/{prefix}_TESS_pieplot.pdf"
+    conda:
+        "envs/pie.yml"
+    script:
+        "scripts/pie_plot.R" 
+
+# rule algatr_generate_index:
+#     input:
+#         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz")
+#     conda:
+#         "envs/bcftools.yml"
+#     output:
+#         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi"
+#     shell:
+#         "bcftools index {input.vcf}"
+
+rule algatr_separate_vcf:
+    input:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        vcf = "results/{refGenome}/CCGP/{prefix}_complete_coords_annotated.vcf.gz",
+        csi = "results/{refGenome}/CCGP/{prefix}_complete_coords_annotated.vcf.gz.csi"
+    output:
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz"
+    conda:
+        "envs/bcftools.yml"
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.scaff.txt"
+    shell:
+         "bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}"
+
+rule algatr_separate_vcf_ld06:
+    input:
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
+        csi = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi",
+    output:
+        scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz"
+    conda:
+        "envs/bcftools.yml"
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}_pruned.scaff.txt"
+    shell:
+         """
+         bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}
+         """
+
+rule algatr_RDA:
+    """
+    call algatr RDA 
+    """
+    input:
+        env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+        #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+        #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+        vcf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt"
+    params:
+        species = config['final_prefix'],
+        data_path = "results/{refGenome}/",
+        output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
+        rmislands = "true",
+        impute = "simple",
+        correctGEO = "false",
+        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        # correctPC = "NULL",
+        nPC = 10,
+        model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+        sig = 0.01, # only for outlier_method = "p"
+        z = 3, # only for outlier_method = "z"
+        Pin = 0.05,
+        R2permutations = 1000,
+        R2scope = "true",
+        p_adj = "fdr", # only if outlier_method = "p"
+        save_impute = "true",
+        intervals = "true",
+        scaff = "{scaff}",
+        env_var_type = "rasterpcs", # "rasterpcs" or "bio1ndvi"
+        shape_path = "/../../data/CA_State/CA_State_TIGER2016.shp",
+        land_type = "terrestrial"
+        ## For three raster PCs
+        # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
+        # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
+        ## For BIO1 + NDVI
+        # env_path = ["/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
+        # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 2000
+    log:
+        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.RDA.txt"
+    benchmark:
+        "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.RDA.benchmark.txt",
+    output: 
+        #rda_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_model_full.RDS",
+        zscore_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
+        rdadapt_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
+        cortest_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
+        imputed_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
+        peakram_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+        #manhat_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_manhattan_full.png"
+        colsum_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+        ybar_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+        v_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+        u_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+        wa_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+        qr_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+        eig_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+        biplot_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+        qraux_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+        envcentre_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+        chi_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+        scalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+        unscalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
+    conda:
+        "envs/algatr.yml"
+    script:
+        "scripts/RDA_cloud.R"
+
+def gather_rda(wildcards):
+    result = dict(
+        zscore_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        rdadapt_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        cortest_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        imputed_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        peakram_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        colsum_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        ybar_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        v_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        u_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        wa_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        qr_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        eig_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        biplot_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        qraux_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        envcentre_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        chi_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        scalload_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        ),
+        unscalload_output=expand(
+            "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
+            refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+        )
+    )
+    return result
+
+#uncomment lines you add to the script
+rule gather_rda:
+    input:
+        unpack(gather_rda)
+    conda:
+        "envs/pie.yml"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_gather_rda.txt"
+    output:
+        zscore_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",
+        rdadapt_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_rdadapt.csv",
+        cortest_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_cortest_full.csv",
+        #imputed_output = "results/{refGenome}/algatr/RDA/{prefix}_imputed_simple.txt",
+        peakram_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_peakRAM.csv",
+        colsum_output = "results/{refGenome}/algatr/RDA/{prefix}_colsum.csv",
+        #ybar_output = "results/{refGenome}/algatr/RDA/{prefix}_Ybar.csv",
+        v_output = "results/{refGenome}/algatr/RDA/{prefix}_v.csv",
+        u_output = "results/{refGenome}/algatr/RDA/{prefix}_u.csv",
+        wa_output = "results/{refGenome}/algatr/RDA/{prefix}_wa.csv",
+        qr_output = "results/{refGenome}/algatr/RDA/{prefix}_qr.csv",
+        eig_output = "results/{refGenome}/algatr/RDA/{prefix}_eig.csv",
+        biplot_output = "results/{refGenome}/algatr/RDA/{prefix}_biplot.csv",
+        qraux_output = "results/{refGenome}/algatr/RDA/{prefix}_qraux.csv",
+        envcentre_output = "results/{refGenome}/algatr/RDA/{prefix}_envcentre.csv",
+        chi_output = "results/{refGenome}/algatr/RDA/{prefix}_totchi.csv",
+        scalload_output = "results/{refGenome}/algatr/RDA/{prefix}_scaledloadings.csv",
+        unscalload_output = "results/{refGenome}/algatr/RDA/{prefix}_unscaledloadings.csv",
+    script:
+        "scripts/gather_rda.R"
+
+rule manhattan:
+    input:
+        rdadapt_output = "results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_rdadapt.csv",
+    conda:
+        "envs/pie.yml"
+    params:
+        sig = 7
+    output:
+        manhattan_plot = "results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png",
+        per_chrom = "results/{refGenome}/algatr/RDA/{prefix}_RDA_per_chrom.pdf"
+    script:
+        "scripts/MANHATTAN.R"
+
+# rule algatr_RDA_pruned:
+#     """
+#     call algatr tess on a pruned dataset
+#     """
+#     input:
+#         #vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz",
+#         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+#         #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+#         #prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz.csi",
+#         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz",
+#         prunedix = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_0.6.vcf.gz.csi",
+#         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         coords = "results/{refGenome}/algatr/{prefix}.coords.txt"
+#     params:
+#         species = config['final_prefix'],
+#         data_path = "results/{refGenome}/",
+#         output_path = "results/{refGenome}/algatr/",
+#         rmislands = "false",
+#         pruned = "true",
+#         impute = "simple",
+#         kvals = "1:10",
+#         correctGEO = "false",
+#         correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         nPC = 10,
+#         model = "full", #TECHINALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+#         sig = 0.01, # only for outlier_method = "p"
+#         z = 3, # only for outlier_method = "z"
+#         Pin = 0.05,
+#         R2permutations = 1000,
+#         R2scope = "true",
+#         p_adj = "fdr", # only if outlier_method = "p"
+#         save_impute = "true",
+#         intervals = "true",
+#         scaff = "NA"
+#     resources:
+#         mem_mb = lambda wildcards, attempt: attempt * 2000
+#     log:
+#         log = "logs/{refGenome}/algatr/{prefix}.RDA.txt"
+#     benchmark:
+#         "results/{refGenome}/benchmarks/{prefix}.RDA.benchmark.txt",
+#     output: 
+#         #impute = "results/{refGenome}/algatr/{prefix}_imputed_structure.txt", #only gets made if imputing is done with snmf
+#         impute = "results/{refGenome}/algatr/{prefix}_imputed_simple.txt", 
+#         #anova = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_anova_best.csv", #uncomment this later, but this file isnt appearing
+#         #cortest = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_cortest_best.csv",
+#         #RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_rdadapt.csv",
+#         #sp_RDA_outliers = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_outliers_best_Zscores.csv",
+#         #peakRAM = "results/{refGenome}/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+#     conda:
+#         "envs/algatr.yml"
+#     script:
+#         "scripts/RDA_cloud.R"
+
+# rule shapeit:
+#     input:
+#         scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+#         #csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
+#         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz",
+#         csi = "results/{refGenome}/algatr/{prefix}_complete_coords_annotated.vcf.gz.csi"
+#     output:
+#         haplo = "results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf"
+#     conda:
+#         "envs/shapeit.yml"
+#     log:
+#         stderr = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.err",
+#         stdout = "logs/{refGenome}/algatr/{prefix}_{scaff}_phased.out"
+#     shell:
+#         #"shapeit4 --input {input.csi} --map {wildcards.scaf} --regions --output {output.haplo}" 
+#         """
+#         bcftools index -f {input.scaf}
+#         SHAPEIT5_phase_common --input {input.scaf} --region {wildcards.scaff} --output {output.haplo} --thread 8 > {log.stdout} 2> {log.stderr}
+#         """
+
+# rule concat_shapeit:
+#     input:
+#         haplo = expand("results/{{refGenome}}/algatr/haplotypes/{{prefix}}_{scaff}_phased.bcf", scaff=get_scaffolds(fai))
+#     output:
+#         haplo = "results/{refGenome}/algatr/{prefix}_shapeit5_phased.bcf"
+#     conda:
+#         "envs/shapeit.yml"
+#     shell:
+#         "bcftools concat -O z -o {output.haplo} {input.haplo}"
+
+rule vcf_to_bed:
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz"
+    params:
+        prefix = "results/{refGenome}/algatr/admixture/{prefix}"
+    output:
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        plink --vcf {input.vcf} --make-bed --out {params.prefix} --allow-extra-chr --autosome-num 95 --const-fid 
+        """
+
+rule setup_admixture:
+    """
+    admixture requires all chromosome names to be integers, this sets them to be 1:n
+    """
+    input:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
+    output:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim_fixed",
+        bim_back = "results/{refGenome}/algatr/admixture/{prefix}.bim.orig",
+    script:
+        "scripts/contigs4admixture.py"
+
+
+rule admixture:
+    """
+    Call Admixture. First, make a bim file that has no characters in the chromosomes
+    """
+    input:
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        bim_fixed = "results/{refGenome}/algatr/admixture/{prefix}.bim_fixed",
+        bim_back =  "results/{refGenome}/algatr/admixture/{prefix}.bim.orig",
+    output:
+        "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        mv {input.bim_fixed} {input.bim} 2> {output}
+        """
+
+rule run_admixture:
+    input:
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    output:
+        Q = "results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q",
+        P = "results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.{seed}.P"
+    params:
+        K = "{K}"
+    shadow:
+        "shallow"
+    log:
+        "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}_seed{seed}.log"
+    conda:
+        "envs/admixture.yml"
+    shell:
+        """
+        admixture --cv=5 --seed={wildcards.seed} {input.bed} {params.K} > {log}
+        
+        mv {wildcards.prefix}.{wildcards.K}.P {output.P}
+        mv {wildcards.prefix}.{wildcards.K}.Q {output.Q}
+        """
+        
+rule evaladmix_env:
+    input:    
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
+    output:
+        success = touch("results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt")
+    params:
+        dwn_dir = "results/{refGenome}/algatr/admixture/evaladmix"
+    shell:
+        """
+        if [ -f {params.dwn_dir}/evalAdmix/evalAdmix ]; then
+                echo "Directory {params.dwn_dir}/evalAdmix already exists."
+            else
+                echo "Directory {params.dwn_dir}/evalAdmix does not exist. Cloning the repository."
+                rm -rf {params.dwn_dir}/evalAdmix/
+                git clone https://github.com/GenisGE/evalAdmix.git {params.dwn_dir}/evalAdmix
+                cd {params.dwn_dir}/evalAdmix
+                make
+                chmod +x -R evalAdmix
+            fi
+        """
+my_basedir = workflow.current_basedir
+
+rule evaladmix:
+    input:    
+        bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        success = "results/{refGenome}/algatr/admixture/{prefix}_evaladmix_env_built.txt"
+        #Q = expand("results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q", 
+        #K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #P = expand("results/{refGenome}/algatr/admixture/P_files/{prefix}.{K}.{seed}.P", 
+        #K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix']),
+    output:
+        evalout = "results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.txt",
+        evalpng = "results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.png"
+    params:
+        dwn_dir = "results/{refGenome}/algatr/admixture/evaladmix",
+        plink = "results/{refGenome}/algatr/admixture/{prefix}",
+        ad_dir = "results/{refGenome}/algatr/admixture/",
+        vis = "results/{refGenome}/algatr/admixture/evaladmix/evalAdmix/visFuns.R",
+    conda:
+        "envs/pie.yml"
+    shell:
+        """
+        pfile={params.ad_dir}/P_files/{wildcards.prefix}.{wildcards.K}.{wildcards.seed}.P
+        qfile={params.ad_dir}/Q_files/{wildcards.prefix}.{wildcards.K}.{wildcards.seed}.Q
+
+        {params.dwn_dir}/evalAdmix/evalAdmix -plink {params.plink} -fname $pfile -qname $qfile -o {output.evalout} -P 5
+        
+        Rscript {my_basedir}/scripts/plot_evalAdmix.R $qfile {output.evalout} {output.evalpng} {wildcards.K} {params.vis} {wildcards.prefix}
+        """
+
+rule combine:
+    input:
+        expand("results/{refGenome}/algatr/admixture/evaladmix/{prefix}_evaladmix_output_{K}.{seed}.png",
+            K=range(1, 11), seed = 42, refGenome = config['refgenome'], prefix=config['final_prefix'])
+    output:
+        touch("results/{refGenome}/algatr/admixture/evaladmix/{prefix}_complete.txt")
+    shell:
+        "echo evaladmix complete"
+
+rule find_best_k:
+    """
+    retrieve cv scores and calculate best and min k 
+    """
+    input:
+        expand(
+            "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}_seed{seed}.log",
+            K=range(1, 11), 
+            seed=[42, 420, 69, 666, 80085],
+            refGenome=config['refgenome'], 
+            prefix=config['final_prefix']
+        )
+    params:
+        species = config['final_prefix'],
+        output_path = "results/{refGenome}/algatr/admixture/logs/"
+    conda:
+        "envs/algatr.yml"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_cvscores.txt"
+    output: 
+    # Exported files are as follows:
+        admix1 = "results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt",
+        admix2 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png",
+        admix3 = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_deltak.png"
+    script:
+        "scripts/admixture_cloud.R" 
+
+rule admixture_composite:
+    input: 
+        cv_errors = "results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt",
+        admx_png_path = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_cv.png",
+        evanno_png_path = "results/{refGenome}/algatr/admixture/logs/{prefix}_admixture_deltak.png",
+        tess = "results/{refGenome}/algatr/{prefix}_TESS_qmatrix.csv",
+        xval = "results/{refGenome}/algatr/{prefix}_TESS_xval.csv",
+        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt",
+        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+        eigenval = "results/{refGenome}/algatr/{prefix}.eigenval",
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam"
+    log:
+        "logs/{refGenome}/algatr/{prefix}_bigplot.txt"
+    conda:
+        "envs/pie.yml"
+    params:
+        admixture_path = "results/{refGenome}/algatr/admixture/Q_files/{prefix}"
+    output:
+        out = "results/{refGenome}/algatr/{prefix}_admixture_composite.pdf",
+        match = "results/{refGenome}/algatr/{prefix}_admixture_tess_merged.csv"
+    script:
+        "scripts/create_admixture_composite.R"
+

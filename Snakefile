@@ -44,11 +44,9 @@ output = [
         #expand("results/{refGenome}/algatr/haplotypes/{prefix}_{scaff}_phased.bcf", refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
         
         # RDA output:
-        #expand("results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
-        expand("results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/algatr/RDA/{prefix}_RDA_manhattan_full.png",refGenome = config['refgenome'], prefix=config['final_prefix']),
-        #expand("results/{refGenome}/algatr/{prefix}_imputed_simple.txt",refGenome = config['refgenome'], prefix=config['final_prefix'], scaff=get_scaffolds(fai)),
-            
+        #us this one 2025:
+        #expand("results/{refGenome}/algatr/RDA/{prefix}_RDA_outliers_full_Zscores.csv",refGenome = config['refgenome'], prefix=config['final_prefix']),
+      
         # # GONE stuff.
        
         # expand("results/{refGenome}/GONE/Linux/{prefix}_plink.map", refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -57,8 +55,11 @@ output = [
         # expand("results/{refGenome}/GONE/Linux/Output_Ne_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         # expand("results/{refGenome}/GONE/Linux/OUTPUT_{prefix}_plink", refGenome = config['refgenome'], prefix=config['final_prefix']),
         
+        #pop analysis
         expand("results/{refGenome}/pop_analysis/{prefix}_k.done", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/pop_analysis/{prefix}_admixture_final.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
+        #expand("results/{refGenome}/pop_analysis/sex_id/{prefix}_sex_chromosome_candidates.csv", refGenome = config['refgenome'], prefix=config['final_prefix']),
+
         # admixture
         expand("results/{refGenome}/algatr/admixture/logs/{prefix}_best_K.txt", refGenome = config['refgenome'], prefix=config['final_prefix']),
         expand("results/{refGenome}/algatr/{prefix}_admixture_composite.pdf", refGenome = config['refgenome'], prefix=config['final_prefix']),
@@ -82,7 +83,7 @@ rule all:
 include: "ccgp/Snakefile"
 #include: "reference/Snakefile"
 include: "local_pca/Snakefile"
-include: "alagtr/Snakefile"
+include: "algatr/Snakefile"
 include: "pop_analysis/Snakefile"
 #include: "../ccgp_feems/Snakefile" #need to get envs set up for this to work
 
