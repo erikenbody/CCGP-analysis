@@ -251,18 +251,16 @@ rule algatr_RDA:
         R2scope = "true",
         p_adj = "fdr", # only if outlier_method = "p"
         save_impute = "true",
-        # intervals = "false",
-        # scaff = "NA",
         intervals = "true",
         scaff = "{scaff}",
         env_var_type = "rasterpcs", # "rasterpcs" or "bio1ndvi"
-        shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only if rmislands=TRUE
+        shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only used if rmislands=TRUE
         land_type = "terrestrial"
         ## For three raster PCs
-        # env_path = "/../../data/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
+        # env_path = "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
         # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
         ## For BIO1 + NDVI
-        # env_path = ["/../../data/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
+        # env_path = ["/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
         # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000
@@ -680,3 +678,4 @@ rule admixture_composite:
     script:
         "scripts/create_admixture_composite.R"
 
+# TODO add LFMM here

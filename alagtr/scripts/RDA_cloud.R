@@ -124,7 +124,7 @@ if (!is.null(ncol(dat$gen))) {
   # Env vars ----------------------------------------------------------------
   
   # Extract and standardize environmental variables and make into dataframe
-  env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE)
+  env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE, exact = TRUE)
   env <- scale(env, center = TRUE, scale = TRUE)
   env <- data.frame(env)
   # When only one env layer provided, env colnames will be named simply 'env' which is not informative
