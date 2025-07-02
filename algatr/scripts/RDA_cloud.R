@@ -10,7 +10,6 @@ suppressMessages({
   library(algatr)
 })
 
-# # example call: `Rscript RDA_cloud.R "59-Ursus" "~/../../media/WangLab/WangLab/CCGP_raw_data/" "outputs/RDA/" FALSE FALSE "structure" 1:5 FALSE FALSE 3 "best" 0.01 3 0.05 1000 TRUE "fdr"`
 # if (!require("algatr", character.only = TRUE)) {
 #   # Install the package if not installed
 #   devtools::install_github("TheWangLab/algatr", quiet = T)
@@ -55,13 +54,13 @@ vcf = snakemake@input[["vcf"]]
 
 source(paste0(snakemake@scriptdir, "/general_functions.R"))
 
+
 # Import and process data -------------------------------------------------
 peakRAM_imp <-
   peakRAM::peakRAM(
     dat <- get_input_objects(species = species, 
                              data_path = data_path,
                              analysis = "vcf",
-                            #  pruned = pruned,
                              impute = impute,
                              rmislands = rmislands,
                              save_impute = FALSE, # save this for later
@@ -71,6 +70,7 @@ peakRAM_imp <-
                              env_var_type = env_var_type,
                              vcf_path = vcf,
                              coords = coords,
+                             shape_path = shape_path,
                              land_type = land_type)
   )
 
@@ -96,6 +96,7 @@ envcentre_output = snakemake@output[["envcentre_output"]]
 chi_output = snakemake@output[["chi_output"]]
 scalload_output = snakemake@output[["scalload_output"]]
 unscalload_output = snakemake@output[["unscalload_output"]]
+
 
 # If no SNPs in scaffold, touch output files and stop ---------------------
 
@@ -123,12 +124,40 @@ if (!is.null(ncol(dat$gen))) {
   # Env vars ----------------------------------------------------------------
   
   # Extract and standardize environmental variables and make into dataframe
-  env <- raster::extract(dat$envlayers, dat$coords)
+  env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE, exact = TRUE)
   env <- scale(env, center = TRUE, scale = TRUE)
   env <- data.frame(env)
   # When only one env layer provided, env colnames will be named simply 'env' which is not informative
   if (ncol(env) == 1) colnames(env) <- names(dat$envlayers)
   
+  # Impute any NA values from nearby samples within a given radius
+  if (any(is.na(env))) {
+    # Count NAs in each column
+    have_nas <- colSums(is.na(env))[colSums(is.na(env)) > 0]
+    coords_sf <- sf::st_as_sf(dat$coords, coords = c("x", "y"), crs = 4326)
+
+    # Impute to the value of the closest sample
+    df <- bind_cols(coords_sf, env)
+    mod_sf <- df %>% sf::st_as_sf()
+
+    close_impute <- function(var, mod_sf){
+      map_dbl(1:nrow(mod_sf), \(i){ 
+        if (!is.na(sf::st_drop_geometry(mod_sf[i, var]))) return(mod_sf[i, var][[1]])
+        # Get the closest sample that is not NA
+        nearest <- sf::st_nearest_feature(mod_sf[i,], drop_na(mod_sf[-i,]), 1)
+        # Get the value of the closest sample
+        return(drop_na(mod_sf)[nearest, var][[1]])
+      }) 
+    }
+    vars <- names(have_nas)
+    names(vars) <- vars
+    sf_imputed <- map(vars, ~close_impute(.x, mod_sf), .progress = TRUE) 
+    df_imputed <- bind_cols(dplyr::select(df, -all_of(vars)), bind_cols(sf_imputed))
+
+    # Extract imputed env values for all samples
+    env <- df_imputed %>% sf::st_drop_geometry() %>% dplyr::select(colnames(env)) %>% as.data.frame()
+  }
+
   # Run RDA -----------------------------------------------------------------
   
   #' Redefined algatr `rda_run()` function to take in Plink PC files for pRDA correctPC

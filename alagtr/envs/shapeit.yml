@@ -1,7 +1,0 @@
-channels:
-  - conda-forge
-  - bioconda
-  - defaults
-dependencies:
-  - shapeit5==5.1.1
-  - bcftools==1.16
