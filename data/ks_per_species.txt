@@ -31,7 +31,7 @@ ccgp_project_id	cluster	species_present
 16-Ariolimax	K1	sp._x29
 16-Ariolimax	K2	sp._x17
 16-Ariolimax	K3	sp._x22
-17-Anthopleura	K1	sola_x113,sp._x29
+17-Anthopleura	K1	sola_x142
 17-Lottia	K1	scabra_x58
 17-Lottia	K2	scabra_x36
 17-Mytilus	K1	californianus_x141
@@ -124,9 +124,9 @@ ccgp_project_id	cluster	species_present
 58-Actinemys	K3	marmorata_x1,pallida_x9
 58-Diadophis	K1	punctatus_x57
 58-Diadophis	K2	punctatus_x74
-58-Sceloporus	K1	occidentalis_x24
-58-Sceloporus	K2	occidentalis_x34
-58-Sceloporus	K3	occidentalis_x39
+58-Sceloporus	K1	occidentalis_x49
+58-Sceloporus	K2	occidentalis_x60
+58-Sceloporus	K3	occidentalis_x92
 59-Ursus	K1	americanus_x39
 59-Ursus	K2	americanus_x12
 59-Ursus	K3	americanus_x14
