@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 include: "common.smk"
+ruleorder: CCGP_remove_samps_no_coords_full > CCGP_annotate
 
 # rule roh:
 #     input:

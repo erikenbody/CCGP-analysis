@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""
+Standalone version of create_coord_sheet_revised.py
+Usage: python create_coord_sheet_revised_standalone.py <project_id> <ref_genome> <sample_type> <samples_file>
+"""
+import sys
+import pandas as pd
+import os
+from db import get_mongo_client
+import math
+import argparse
+
+client = get_mongo_client()
+db = client["ccgp_dev"]
+collection = db["sample_metadata"]
+wd_scripts = os.getcwd()
+wd_parent = os.getcwd()
+
+def mongo_get_coords(project, ref_genome, sample_type, vcf_samples):
+
+    data_list = []
+    no_coords = []
+    sample_bucket = []
+    query_criteria = {"ccgp-project-id": project}
+    samps_no_coords = vcf_samples.copy()
+
+    sample_entries_for_project = collection.find(query_criteria)
+
+    for sample in sample_entries_for_project:
+        sample_name_exist = False
+        minicore_seq_exist = False
+        # if sample.get("*sample_name", "Womp_Womp") in vcf_samples:
+        #     sample_name_exist = True
+        if str(sample["*sample_name"]) in vcf_samples:
+            sample_name_exist = True
+
+        minicore_seq_ids = sample.get("minicore_seq_id", "")
+        if isinstance(minicore_seq_ids, str):  # Ensure it's a string
+            minicore_seq_ids_list = [seq_id.strip() for seq_id in minicore_seq_ids.split(",")]  # Split and clean
+            if any(seq_id in vcf_samples for seq_id in minicore_seq_ids_list):  # Check if any match
+                minicore_seq_exist = True
+        # if sample.get("minicore_seq_id", "Womp") in vcf_samples:
+        #     minicore_seq_exist = True
+        if sample_name_exist and minicore_seq_exist:
+            print('IDENTICAL SAMPLE_NAME & MINICORE')
+            print('')
+            sample_name = str(sample.get("*sample_name", ""))
+            print(sample_name)
+            lat = sample.get("lat", "")
+            long = sample.get("long", "")
+
+            if lat == '' or lat == 0 or str(lat).lower() == 'nan':
+                no_coords.append(sample_name)
+            else:
+                data_list.append({"Sample Name": sample_name, "Long": float(long), "Lat": float(lat)})
+            samps_no_coords.remove(sample_name)
+            continue
+
+        if sample_name_exist: #IF THE ENTRY USES SAMPLE_NAMES
+            print('SAMPLE_NAME')
+            print('')
+            sample_name = str(sample.get("*sample_name", ""))
+            lat = sample.get("lat", "")
+            long = sample.get("long", "")
+            print(str(lat).lower()=='nan')
+            print(str(lat).lower())
+            if lat == '' or lat == 0 or str(lat).lower() == 'nan':
+                no_coords.append(sample_name)
+            else:
+                data_list.append({"Sample Name": sample_name, "Long": float(long), "Lat": float(lat)})
+            print(sample_name)
+            samps_no_coords.remove(sample_name)
+        #print(sample_name)
+        if minicore_seq_exist:
+            print("MINICORE")
+            print('')
+            # sample_name = sample.get("minicore_seq_id", "")
+
+            minicore_seq_ids = sample.get("minicore_seq_id", "")
+
+            if isinstance(minicore_seq_ids, str):
+                sample_name = minicore_seq_ids.split(",")[0].strip()
+            else:
+                sample_name = str(minicore_seq_ids)
+
+
+
+            lat = sample.get("lat", "")
+            long = sample.get("long", "")
+
+            if lat == '' or lat == 0 or str(lat).lower() == 'nan':
+                no_coords.append(sample_name)
+            else:
+                data_list.append({"Sample Name": sample_name, "Long": float(long), "Lat": float(lat)})
+            print(sample_name)
+            samps_no_coords.remove(sample_name)
+        # else:
+        #     no_coords.append(sample)
+
+    df = pd.DataFrame(data_list)
+    df_nocoords = pd.DataFrame(no_coords)
+    num_rows = df.shape[0]
+
+    if num_rows == 0:
+        print(f"No results found for project {project}. Skipping...")
+
+    print(f"Number of samples considered = {len(vcf_samples)}")
+    print(f"Number of samples WITH coords for {project}: {num_rows}")
+    print(f"Number of samples WITHOUT coords for {project}: {len(no_coords)}")
+    output_file_path = os.path.join(wd_scripts, "results", ref_genome, "CCGP", f"{project}.coords.txt")
+    output_file_path_nocoords = os.path.join(wd_scripts, "results", ref_genome, "CCGP", f"{project}.no_coords.txt")
+    #print(output_file_path)
+
+    df.to_csv(output_file_path, sep="\t", index=False, header=False)
+    # for samp in samps_no_coords:
+    #     print(samp)
+
+
+    with open(output_file_path_nocoords, 'w') as file:
+        for samp in no_coords:
+            file.write(samp + '\n')
+
+
+    print(f'Got {project} coords.')
+    print('')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Get coordinate information for CCGP samples from MongoDB',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Example usage:
+  python create_coord_sheet_revised_standalone.py 59-Ursus GCA_024610735.1 sample_id samples.txt
+  python create_coord_sheet_revised_standalone.py <project_id> <ref_genome> <sample_type> <samples_file>
+        """
+    )
+
+    parser.add_argument('project_id', help='CCGP project ID (e.g., 59-Ursus)')
+    parser.add_argument('ref_genome', help='Reference genome ID (e.g., GCA_024610735.1)')
+    parser.add_argument('sample_type', help='Sample ID type identifier')
+    parser.add_argument('samples_file', help='Path to file containing sample names (one per line)')
+
+    args = parser.parse_args()
+
+    # Read samples from file
+    vcf_samples = []
+    with open(args.samples_file) as file:
+        for sample in file:
+            vcf_samples.append(sample.strip())
+
+    # Run the coordinate extraction
+    mongo_get_coords(args.project_id, args.ref_genome, args.sample_type, vcf_samples)

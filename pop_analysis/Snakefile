@@ -1,3 +1,6 @@
+ruleorder: pop_remove_problem_snps > subsample_snps
+
+
 def get_k_values(wc):
     pops = checkpoints.distinguish_populations.get(**wc).output[1]
 
@@ -27,9 +30,11 @@ def get_k(wc):
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/freq/{prefix}.rxy", **wc, k=k_values)
         #*expand("results/{refGenome}/pop_analysis/{prefix}_mutation_load/{prefix}_population_{k}_phylo_p_hom_count.txt", **wc, k=k_values),
 
-        #*expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/{prefix}_GONE_Ne_change_population_{k}.csv", **wc, k=k_values),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_clam/pop_{k}_clam_summary.tsv", **wc, k=k_values),
         #*expand("results/{refGenome}/pop_analysis/{prefix}_clam/population_{k}/clam_het.tsv", **wc, k=k_values),
+        *expand("results/{refGenome}/pop_analysis/{prefix}_merged_roh/pop_{k}_all_indiv_roh.pdf", **wc, k=k_values),
+
     ]
     
     return out
@@ -47,7 +52,7 @@ rule extract_vcf_data_for_sex_id:
         vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz",
         vcf_index = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz.csi"
     output:
-        raw_data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_raw_data.tsv.gz"
+        raw_data = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_raw_data.tsv.gz"
     params:
         query_format = r'[%CHROM\t%SAMPLE\t%DP\t%GT\n]'
     conda:
@@ -63,19 +68,39 @@ rule analyze_sex_data:
     performs clustering, and generates reports and plots.
     """
     input:
-        raw_data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_raw_data.tsv.gz",
+        raw_data = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_raw_data.tsv.gz",
         vcf_path_for_lengths = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"
     output:
-        report = "results/{refGenome}/pop_analysis/sex_id/{prefix}_sex_chromosome_candidates.csv",
-        data = "results/{refGenome}/pop_analysis/sex_id/{prefix}_depth_heterozygosity.csv",
-        plot = "results/{refGenome}/pop_analysis/sex_id/{prefix}_chromosome_depth_heterozygosity.png",
-        exclude_scaffolds = "results/{refGenome}/pop_analysis/sex_id/{prefix}_exclude_scaffolds.txt"
+        report = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_sex_chromosome_candidates.csv",
+        data = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_depth_heterozygosity.csv",
+        plot = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_chromosome_depth_heterozygosity.png",
+        exclude_scaffolds = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_exclude_scaffolds.txt"
     conda:
         "envs/sex_id.yml"
     log:
         "logs/{refGenome}/identify_sex_chromosomes/{prefix}.analyze.log"
     script:
         "scripts/identify_sex_linked_scaffolds.py"
+
+rule analyze_scaffold_anomalies:
+    """
+    Analyzes scaffolds for anomalous depth and heterozygosity patterns.
+    Identifies potential structural variants, haplotigs, or contamination.
+    Creates CSV, summary text, and visualization plot.
+    """
+    input:
+        depth_het = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_depth_heterozygosity.csv",
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"
+    output:
+        csv = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_scaffold_anomalies.csv",
+        txt = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_scaffold_anomalies_summary.txt",
+        png = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_anomaly_visualization.png"
+    conda:
+        "envs/sex_id.yml"
+    log:
+        "logs/{refGenome}/identify_sex_chromosomes/{prefix}.anomalies.log"
+    script:
+        "scripts/analyze_scaffold_anomalies.py"
 
 rule get_GONE_contigs:
     input:
@@ -145,7 +170,8 @@ rule pop_bcf_populations:
         pops = "results/{refGenome}/pop_analysis/{prefix}_populations/population_{k}.txt",
         csi = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz.csi",
         vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt"
+        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+        exclude_scaffolds = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_exclude_scaffolds.txt"
     output:
         pop_vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
         index = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz.csi"
@@ -153,7 +179,8 @@ rule pop_bcf_populations:
         "envs/roh.yml"
     shell:
         """
-        bcftools view -S {input.pops} -Ou -a -U {input.vcf} | bcftools +fill-tags -O z -o {output.pop_vcf}
+        EXCLUDE_SCAFFOLDS=$(tr '\n' ',' < {input.exclude_scaffolds} | sed 's/,$//')
+        bcftools view -S {input.pops} -t ^$EXCLUDE_SCAFFOLDS -Ou -a -U {input.vcf} | bcftools +fill-tags -O z -o {output.pop_vcf}
         bcftools index {output.pop_vcf}
         """
 
@@ -186,12 +213,14 @@ rule pop_assign_chroms_pop_vcfs:
         pop_vcf_annotated = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
         chrom_names = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_contigs.txt"
     output:
-        GONE_pop_vcfs = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz",
+        GONE_pop_vcfs = temp("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz"),
+        GONE_pop_csi = temp("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz.csi")
     conda:
         "envs/roh.yml"
     shell:
         '''
         bcftools view -t $(cat {input.chrom_names} | tr '\n' ',') -Oz -o {output.GONE_pop_vcfs} {input.pop_vcf_annotated}
+        bcftools index {output.GONE_pop_vcfs}
         '''
 
 rule pop_find_problem_snps:
@@ -201,6 +230,7 @@ rule pop_find_problem_snps:
     '''
     input:
         GONE_pop_vcfs = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz",
+        GONE_pop_csi = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz.csi"
     output:
         snp_positions = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_snp_positions/position_pop_{k}.txt.gz",
     conda:
@@ -208,7 +238,7 @@ rule pop_find_problem_snps:
     shell:
         '''
         bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n' {input.GONE_pop_vcfs} | awk 'length($3) == 1 && length($4) == 1 {{print $1"\t"$2}}' | bgzip -c > {output.snp_positions} 
-        tabix -s1 -b2 -e2 {output.snp_positions}
+        tabix --csi -s1 -b2 -e2 {output.snp_positions}
         '''
 
 rule pop_remove_problem_snps:
@@ -218,15 +248,14 @@ rule pop_remove_problem_snps:
     input:
         snp_positions = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_snp_positions/position_pop_{k}.txt.gz",
         GONE_pop_vcfs = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz",
+        GONE_pop_csi = temp("results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz.csi")
     output:
         indel_absent_vcf = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz",
         indel_absent_vcf_csi = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz.csi",
-        GONE_pop_csi = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_renamed_vcfs/renamed_population_{k}.vcf.gz.csi"
     conda:
         "envs/roh.yml"
     shell:
         '''
-        bcftools index {input.GONE_pop_vcfs}
         bcftools view -T {input.snp_positions} {input.GONE_pop_vcfs} -O u -a -U | bcftools +fill-tags -Ou |
         bcftools view -e 'AF==0 | AF==1 | ref="N" | ALT="."' -O z -o {output.indel_absent_vcf}
         bcftools index {output.indel_absent_vcf}
@@ -235,6 +264,7 @@ rule pop_remove_problem_snps:
 rule subsample_snps:
     input:
         indel_absent_vcf = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz",
+        indel_absent_vcf_csi = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}.vcf.gz.csi",
         chrom_names = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_contigs.txt"
     output:
         subsamp = "results/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_GONE_vcfs/snp_renamed_population_{k}_50k_seed_{seed}.vcf.gz",
@@ -319,35 +349,42 @@ rule GONE:
         mapp = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_pop_maps/{prefix}_pop_{k}_seed_{seed}_plink.map",
         ped = "results/{refGenome}/pop_analysis/{prefix}_GONE/pop_beds/{prefix}_pop_{k}_seed_{seed}_plink.ped",
     output:
-        map_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux/{prefix}_pop_{k}_seed_{seed}_plink.map",
-        ped_GONE = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux/{prefix}_pop_{k}_seed_{seed}_plink.ped",
         GONE_out_d2 = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_d2_{prefix}_pop_{k}_seed_{seed}_plink",
         GONE_out_Ne = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/Output_Ne_{prefix}_pop_{k}_seed_{seed}_plink",
         GONE_output = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/OUTPUT_{prefix}_pop_{k}_seed_{seed}_plink",
     params:
-        GONE_dwn_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}",
-        GONE_dir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}/GONE/Linux",
-        ccgp_id = '{prefix}_pop_{k}_seed_{seed}_plink'
-    shadow: "full"
+        workdir = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_population_{k}_seed_{seed}",
+        ccgp_id = '{prefix}_pop_{k}_seed_{seed}_plink',
+        gone_base = "/scratch2/erik/CCGP-reruns/GONE/Linux",
+        threads = 10
+    log:
+        "logs/{refGenome}/pop_analysis/{prefix}_GONE/{prefix}_pop_{k}_seed_{seed}.log"
+    threads: 10
+    shadow: "shallow"
     shell:
         '''
-        if [ -f {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh ]; then
-            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh already exists."
-        else
-            echo "Directory {params.GONE_dwn_dir}/GONE/Linux/GONE_script.sh does not exist. Cloning the GONE repository."
-            rm -rf {params.GONE_dwn_dir}/GONE/
-            git clone https://github.com/esrud/GONE.git {params.GONE_dwn_dir}/GONE
-            chmod -R +x {params.GONE_dwn_dir}/GONE
-        fi
+        # Symlink input data to shadow directory
+        ln -s $(readlink -f {input.mapp}) {params.ccgp_id}.map
+        ln -s $(readlink -f {input.ped}) {params.ccgp_id}.ped
 
-        cp {input.mapp} {params.GONE_dir}
-        cp {input.ped} {params.GONE_dir}
+        # Create modified INPUT_PARAMETERS_FILE
+        sed 's/^threads=-99/threads={params.threads}/' {params.gone_base}/INPUT_PARAMETERS_FILE > INPUT_PARAMETERS_FILE
 
-        cd {params.GONE_dir} 
-        sed -i 's/^threads=-99/threads=10/' INPUT_PARAMETERS_FILE
+        # Create modified script_GONE.sh with thread fix
+        sed 's|\\./PROGRAMMES/GONEparallel\\.sh -hc \\$hc outfileLD \\$REPS|{params.gone_base}/PROGRAMMES/GONEparallel.sh -hc $hc outfileLD $REPS $threads|' \
+            {params.gone_base}/script_GONE.sh > script_GONE.sh
+        chmod +x script_GONE.sh
+
+        # Create symlink to PROGRAMMES directory
+        ln -s {params.gone_base}/PROGRAMMES PROGRAMMES
+
+        # Run GONE
         bash script_GONE.sh {params.ccgp_id}
 
-        mv O*{params.ccgp_id} ../../
+        # Move outputs to final location
+        mv Output_d2_{params.ccgp_id} {output.GONE_out_d2}
+        mv Output_Ne_{params.ccgp_id} {output.GONE_out_Ne}
+        mv OUTPUT_{params.ccgp_id} {output.GONE_output}
         '''
 
 rule pop_plot_GONE_output:
@@ -374,14 +411,18 @@ rule pop_plot_all_seeds:
     input:
         GONE_out_Ne = get_all_GONE_out_Ne
     output:
-        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds.png",
-        GONE_avg_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/GONE_plot_population_{k}_all_seeds_V2.png"
+        GONE_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/{prefix}_GONE_plot_population_{k}_all_seeds.png",
+        GONE_avg_plot = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/{prefix}_GONE_plot_population_{k}_all_seeds_V2.png",
+        GONE_summary_stats = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/{prefix}_GONE_summary_stats_population_{k}.csv",
+        GONE_Ne_change = "results/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plots/{prefix}_GONE_Ne_change_population_{k}.csv"
     params:
         project_id = "{prefix}",
         population_id = "{k}",
         seeds = list(range(1, 11))
+    log:
+        "logs/{refGenome}/pop_analysis/{prefix}_GONE/GONE_plot_population_{k}_all_seeds.log"
     script:
-        "scripts/plot_GONE_all_seeds.py"
+        "scripts/plot_GONE_all_seeds.R"
 
 ###### ROH AND PI RULES####################
 
@@ -439,6 +480,58 @@ rule pop_froh:
         min_roh_size = 500000
     script:
         "scripts/froh.py"
+
+# Helper function for the plotting rule
+def get_pi_files_for_a_single_pop(wildcards):
+    """
+    Finds all individual pi files for a specific population k.
+    """
+    pop_file = f"results/{wildcards.refGenome}/pop_analysis/{wildcards.prefix}_populations/population_{wildcards.k}.txt"
+    with open(pop_file, 'r') as f:
+        samples = [line.strip() for line in f if line.strip()]
+    
+    return expand(
+        "results/{refGenome}/pop_analysis/{prefix}_individual_pi/{k}/{sample}.windowed.pi",
+        refGenome=wildcards.refGenome,
+        prefix=wildcards.prefix,
+        k=wildcards.k,
+        sample=samples
+    )
+
+# New rule to calculate pi for one individual
+rule pi_per_individual:
+    input:
+        vcf = "results/{refGenome}/pop_analysis/{prefix}_population_vcf/population_{k}.vcf.gz",
+    output:
+        pi = "results/{refGenome}/pop_analysis/{prefix}_individual_pi/{k}/{sample}.windowed.pi"
+    params:
+        prefix = "results/{refGenome}/pop_analysis/{prefix}_individual_pi/{k}/{sample}"
+    conda:
+        "envs/vcftools_individuals.yml"
+    shell:
+        """
+        vcftools --gzvcf {input.vcf} \
+            --indv {wildcards.sample} \
+            --window-pi 10000 \
+            --out {params.prefix}
+        """
+
+# New rule to create plots for one population
+rule pop_qc_plots_per_pop:
+    input:
+        pi_files = get_pi_files_for_a_single_pop,
+        roh = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh",
+        top = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/{prefix}_filtered_population_{k}_top.froh"
+    output:
+        roh1 = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/pop_{k}_all_indiv_roh.pdf",
+        roh2 = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/pop_{k}_pi_roh_top.pdf",
+        roh3 = "results/{refGenome}/pop_analysis/{prefix}_merged_roh/pop_{k}_roh_pi_ridges.pdf"
+    params:
+        population = "{k}"
+    conda:
+        "envs/rplots.yml"
+    script:
+        "scripts/roh_viz_updated.R"
 
 ### THESE 2 RULES RUN IF "RENAME_CONTIGS" == TRUE. ###
 rule get_chromosome_names:

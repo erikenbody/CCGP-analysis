@@ -219,80 +219,80 @@ rule algatr_separate_vcf_ld06:
          bcftools view -r {wildcards.scaff} {input.vcf} -Oz -o {output.scaf}
          """
 
-# TODO python function for env layers if land_type = marine or terrestrial
+# TODO python function for env layers if land_type = marine or terrestrial from CCGP taxonomy file
 
-rule algatr_RDA:
-    """
-    call algatr RDA 
-    """
-    input:
-        env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
-        #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
-        #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
-        #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
-        vcf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
-        eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        coords = "results/{refGenome}/CCGP/{prefix}.coords.txt"
-    params:
-        species = config['final_prefix'],
-        data_path = "results/{refGenome}/",
-        output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
-        rmislands = "true",
-        impute = "simple",
-        correctGEO = "false",
-        correctPC = "results/{refGenome}/algatr/{prefix}.eigenvec",
-        # correctPC = "NULL",
-        nPC = 3,
-        model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
-        sig = 0.01, # only for outlier_method = "p"
-        z = 3, # only for outlier_method = "z"
-        Pin = 0.05,
-        R2permutations = 1000,
-        R2scope = "true",
-        p_adj = "fdr", # only if outlier_method = "p"
-        save_impute = "true",
-        intervals = "true",
-        scaff = "{scaff}",
-        env_var_type = "rasterpcs", # "rasterpcs" or "bio1ndvi"
-        shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only used if rmislands=TRUE
-        land_type = "terrestrial"
-        ## For three raster PCs
-        # env_path = "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
-        # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
-        ## For BIO1 + NDVI
-        # env_path = ["/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
-        # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
-    resources:
-        mem_mb = lambda wildcards, attempt: attempt * 2000
-    log:
-        "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.RDA.txt"
-    benchmark:
-        "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.RDA.benchmark.txt",
-    output: 
-        #rda_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_model_full.RDS",
-        zscore_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
-        rdadapt_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
-        cortest_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
-        imputed_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
-        peakram_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
-        #manhat_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_manhattan_full.png"
-        colsum_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
-        ybar_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
-        v_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
-        u_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
-        wa_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
-        qr_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
-        eig_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
-        biplot_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
-        qraux_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
-        envcentre_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
-        chi_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
-        scalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
-        unscalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
-    conda:
-        "envs/algatr.yml"
-    script:
-        "scripts/RDA_cloud.R"
+# rule algatr_RDA:
+#     """
+#     call algatr RDA 
+#     """
+#     input:
+#         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+#         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+#         #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+#         vcf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
+#         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         coords = "results/{refGenome}/CCGP/{prefix}.coords.txt"
+#     params:
+#         species = config['final_prefix'],
+#         data_path = "results/{refGenome}/",
+#         output_path = "results/{refGenome}/algatr/subsets/RDA/{scaff}/",
+#         rmislands = "true",
+#         impute = "simple",
+#         correctGEO = "false",
+#         correctPC = config['correctPC'], # true or false
+#         pc_path = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         nPC = 3,
+#         model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+#         sig = 0.01, # only for outlier_method = "p"
+#         z = 3, # only for outlier_method = "z"
+#         Pin = 0.05,
+#         R2permutations = 1000,
+#         R2scope = "true",
+#         p_adj = "fdr", # only if outlier_method = "p"
+#         save_impute = "true",
+#         intervals = "true",
+#         scaff = "{scaff}",
+#         env_var_type = config['env_var_type'],
+#         shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only used if rmislands=TRUE
+#         land_type = config['land_type']
+#         ## For three raster PCs
+#         # env_path = "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
+#         # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
+#         ## For BIO1 + NDVI
+#         # env_path = ["/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
+#         # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
+#     resources:
+#         mem_mb = lambda wildcards, attempt: attempt * 2000
+#     log:
+#         "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.RDA.txt"
+#     benchmark:
+#         "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.RDA.benchmark.txt",
+#     output: 
+#         #rda_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_model_full.RDS",
+#         zscore_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_Zscores.csv",
+#         rdadapt_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_outliers_full_rdadapt.csv",
+#         cortest_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_cortest_full.csv",
+#         imputed_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_imputed_simple.txt",
+#         peakram_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_peakRAM.csv",
+#         #manhat_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_RDA_manhattan_full.png"
+#         colsum_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_colsum.csv",
+#         ybar_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_Ybar.csv",
+#         v_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_v.csv",
+#         u_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_u.csv",
+#         wa_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_wa.csv",
+#         qr_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qr.csv",
+#         eig_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_eig.csv",
+#         biplot_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_biplot.csv",
+#         qraux_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_qraux.csv",
+#         envcentre_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_envcentre.csv",
+#         chi_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_totchi.csv",
+#         scalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_scaledloadings.csv",
+#         unscalload_output = "results/{refGenome}/algatr/subsets/RDA/{scaff}/{prefix}_unscaledloadings.csv",
+#     conda:
+#         "envs/algatr.yml"
+#     script:
+#         "scripts/RDA_cloud.R"
 
 def gather_rda(wildcards):
     result = dict(
@@ -548,6 +548,8 @@ rule admixture:
 rule run_admixture:
     input:
         bed = "results/{refGenome}/algatr/admixture/{prefix}.bed",
+        bim = "results/{refGenome}/algatr/admixture/{prefix}.bim",
+        fam = "results/{refGenome}/algatr/admixture/{prefix}.fam",
         fix = "results/{refGenome}/algatr/admixture/{prefix}_bim_fixed.txt"
     output:
         Q = "results/{refGenome}/algatr/admixture/Q_files/{prefix}.{K}.{seed}.Q",
@@ -555,7 +557,7 @@ rule run_admixture:
     params:
         K = "{K}"
     shadow:
-        "shallow"
+        "minimal"
     log:
         "results/{refGenome}/algatr/admixture/logs/{prefix}_admix_K{K}_seed{seed}.log"
     conda:
@@ -678,4 +680,122 @@ rule admixture_composite:
     script:
         "scripts/create_admixture_composite.R"
 
-# TODO add LFMM here
+# TODO add algatr_LFMM here
+# rule algatr_LFMM:
+#     """
+#     call algatr LFMM 
+#     """
+#     input:
+#         env = "results/{refGenome}/algatr/{prefix}_env_created.txt",
+#         #vcf = ancient("results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz"),
+#         #pruned6 = ancient("results/{refGenome}/CCGP/{prefix}_annotated_pruned_0.6.vcf.gz"),
+#         #scaf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated.vcf.gz",
+#         vcf = "results/{refGenome}/algatr/subsets/{prefix}_{scaff}_annotated_pruned_0.6.vcf.gz",
+#         coords = "results/{refGenome}/CCGP/{prefix}.coords.txt"
+#     params:
+#         species = config['final_prefix'],
+#         data_path = "results/{refGenome}/",
+#         output_path = "results/{refGenome}/algatr/subsets/LFMM/{scaff}/",
+#         rmislands = "true",
+#         impute = "simple",
+#         # TODO change below to LFMM params
+#         correctGEO = "false",
+#         correctPC = config['correctPC'], # true or false
+#         pc_path = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         nPC = 3,
+#         model = "full", #TECHNICALLY SNAKEMAKE WOULDNT WORK IF I CHANGE THIS
+#         sig = 0.01, # only for outlier_method = "p"
+#         z = 3, # only for outlier_method = "z"
+#         Pin = 0.05,
+#         R2permutations = 1000,
+#         R2scope = "true",
+#         p_adj = "fdr", # only if outlier_method = "p"
+#         save_impute = "true",
+#         intervals = "true",
+#         scaff = "{scaff}",
+#         env_var_type = config['env_var_type'],
+#         shape_path = "/../../data/CA_State_2024_noChannelIslands/CA_State_2024.shp", # only used if rmislands=TRUE
+#         land_type = config['land_type']
+#         ## For three raster PCs
+#         # env_path = "/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1_pca.tif", # three enviro PCs
+#         # layers = "all", # "all" for all layers in stack or name of particular layer(s) to be run
+#         ## For BIO1 + NDVI
+#         # env_path = ["/../../data/env/california_chelsa_bioclim_1981-2010_V.2.1.tif", "/../../data/california_ndvi_mean_2000_2020.tif"], # path to raw envlayers
+#         # layers = ["CHELSA_bio1_1981-2010_V.2.1", "NDVI"],
+#     resources:
+#         mem_mb = lambda wildcards, attempt: attempt * 2000
+#     log:
+#         "logs/{refGenome}/algatr/subsets/{prefix}_{scaff}.LFMM.txt"
+#     benchmark:
+#         "results/{refGenome}/benchmarks/subsets/{prefix}_{scaff}.LFMM.benchmark.txt",
+#     output: 
+#         imputed_output = "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_imputed_simple.txt",
+#         peakram_output = "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_LFMM_peakRAM.csv",
+#         #manhat_output = "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_LFMM_manhattan_full.png",
+#         # TODO change below to LFMM output files
+#         unscalload_output = "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_unscaledloadings.csv",
+#     conda:
+#         "envs/algatr.yml"
+#     script:
+#         "scripts/LFMM_cloud.R"
+
+# TODO add gather_lfmm rule and function
+# def gather_rda(wildcards):
+#     result = dict(
+#         imputed_output=expand(
+#             "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_imputed_simple.txt",
+#             refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+#         ),
+#         peakram_output=expand(
+#             "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_LFMM_peakRAM.csv",
+#             refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+#         ),
+#         # TODO change below to LFMM output files
+#         scalload_output=expand(
+#             "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_scaledloadings.csv",
+#             refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+#         ),
+#         unscalload_output=expand(
+#             "results/{refGenome}/algatr/subsets/LFMM/{scaff}/{prefix}_unscaledloadings.csv",
+#             refGenome=wildcards.refGenome, prefix=wildcards.prefix, scaff=get_scaffolds(fai)
+#         )
+#     )
+#     return result
+
+# rule gather_lfmm:
+#     input:
+#         unpack(gather_lfmm)
+#     conda:
+#         "envs/pie.yml"
+#     log:
+#         "logs/{refGenome}/algatr/{prefix}_gather_lfmm.txt"
+#     output:
+#         #imputed_output = "results/{refGenome}/algatr/LFMM/{prefix}_imputed_simple.txt",
+#         peakram_output = "results/{refGenome}/algatr/LFMM/{prefix}_LFMM_peakRAM.csv",
+#         # TODO change below to LFMM output files
+#         unscalload_output = "results/{refGenome}/algatr/LFMM/{prefix}_unscaledloadings.csv",
+#     script:
+#         "scripts/gather_lfmm.R"
+
+# TODO generate distance files of outliers for GDM-based offset
+
+# rule algatr_plink_pca:
+#     """
+#     Call plink PCA. Needed for input to RDA analysis
+#     """
+#     input:
+#         vcf = "results/{refGenome}/CCGP/{prefix}_pruned_mil.vcf.gz", #THIS IS NOW COMPLETE COORDS
+#         #vcf = "results/{refGenome}/algatr/{prefix}_complete_coords_pruned_mil.vcf.gz",
+#     params:
+#         prefix = "results/{refGenome}/algatr/{prefix}"
+#     output: 
+#         eigenvec = "results/{refGenome}/algatr/{prefix}.eigenvec",
+#         eigenval = "results/{refGenome}/algatr/{prefix}.eigenval",
+#     conda:
+#         "envs/plink.yml"
+#     resources:
+#         mem_mb = lambda wildcards, attempt: attempt * 2000
+#     shell:
+#         """
+#         plink2 --vcf {input.vcf} --pca 10 --out {params.prefix} --allow-extra-chr --autosome-num 95 --const-fid --bad-freqs
+#         """
