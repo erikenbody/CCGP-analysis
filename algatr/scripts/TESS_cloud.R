@@ -75,7 +75,6 @@ peakRAM_imp <-
     dat <- get_input_objects(species = species, 
                              data_path = data_path,
                              analysis = "vcf",
-                             pruned = TRUE,
                              impute = "none",
                              rmislands = rmislands,
                              incl_env = incl_env,

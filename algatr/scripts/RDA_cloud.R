@@ -33,21 +33,22 @@ output_path = snakemake@params[[3]]
 rmislands = as.logical(snakemake@params[[4]])
 impute = snakemake@params[[5]]
 correctGEO = as.logical(snakemake@params[[6]])
-correctPC = snakemake@params[[7]]
-nPC = snakemake@params[[8]]
-model = snakemake@params[[9]]
-sig = snakemake@params[[10]] # only for outlier_method = "p"
-z = snakemake@params[[11]]# only for outlier_method = "z"
-Pin = snakemake@params[[12]]
-R2permutations = snakemake@params[[13]]
-R2scope = as.logical(snakemake@params[[14]])
-p_adj = snakemake@params[[15]] # only if outlier_method = "p"
-save_impute = as.logical(snakemake@params[[16]])
-intervals = as.logical(snakemake@params[[17]])
-scaff = as.character(snakemake@params[[18]])
-env_var_type = as.character(snakemake@params[[19]])
-shape_path = as.character(snakemake@params[[20]])
-land_type = as.character(snakemake@params[[21]])
+correctPC = snakemake@params[[7]] # true or false
+pc_path = snakemake@params[[8]]
+nPC = snakemake@params[[9]]
+model = snakemake@params[[10]]
+sig = snakemake@params[[11]] # only for outlier_method = "p"
+z = snakemake@params[[12]]# only for outlier_method = "z"
+Pin = snakemake@params[[13]]
+R2permutations = snakemake@params[[14]]
+R2scope = as.logical(snakemake@params[[15]])
+p_adj = snakemake@params[[16]] # only if outlier_method = "p"
+save_impute = as.logical(snakemake@params[[17]])
+intervals = as.logical(snakemake@params[[18]])
+scaff = as.character(snakemake@params[[19]])
+env_var_type = snakemake@params[[20]]
+shape_path = as.character(snakemake@params[[21]])
+land_type = snakemake@params[[22]]
 
 coords = snakemake@input[["coords"]]
 vcf = snakemake@input[["vcf"]]
@@ -124,7 +125,8 @@ if (!is.null(ncol(dat$gen))) {
   # Env vars ----------------------------------------------------------------
   
   # Extract and standardize environmental variables and make into dataframe
-  env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE, exact = TRUE)
+  if (land_type == "terrestrial") env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE)
+  if (land_type == "marine") env <- terra::extract(dat$envlayers, dat$coords, ID = FALSE, method = "bilinear")
   env <- scale(env, center = TRUE, scale = TRUE)
   env <- data.frame(env)
   # When only one env layer provided, env colnames will be named simply 'env' which is not informative
@@ -175,7 +177,7 @@ if (!is.null(ncol(dat$gen))) {
   #'
   #' @return RDA model
   #' @export
-  rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FALSE, correctPC, nPC = 3,
+  rda_run_pc <- function(gen, env, coords = NULL, model = "full", correctGEO = FALSE, correctPC, pc_path, nPC = 3,
                          Pin = 0.05, R2permutations = 1000, R2scope = T) {
     
     # Check that env var names don't match coord names
@@ -183,12 +185,10 @@ if (!is.null(ncol(dat$gen))) {
       colnames(env) <- paste(colnames(env), "_env", sep = "")
       warning("env names should differ from x and y. Appending 'env' to env names")
     }
-    
-    if (correctPC == "NULL") correctPC = NULL
 
-    if (!is.null(correctPC)) {
+    if (correctPC) {
       # Read in PCs
-      pc <- readr::read_tsv(paste0(correctPC)) %>%
+      pc <- readr::read_tsv(paste0(pc_path)) %>%
         tibble::column_to_rownames(var = "#IID") %>% 
         dplyr::select(tidyselect::all_of(1:nPC))
     }
@@ -199,7 +199,7 @@ if (!is.null(ncol(dat$gen))) {
     }
     
     if (any(is.na(env))) {
-      if (!is.null(correctPC)) {
+      if (correctPC) {
         warning("Missing values found in env data, removing rows with NAs")
         na_env <- env
         gen <- gen[complete.cases(na_env), ]
@@ -213,7 +213,7 @@ if (!is.null(ncol(dat$gen))) {
         warning("env names should differ from PC1, PC2, etc if correctPC is TRUE. Appending 'env' to env names")
     }
       }
-      if (is.null(correctPC)) {
+      if (!correctPC) {
         warning("Missing values found in env data, removing rows with NAs")
         na_env <- env
         gen <- gen[complete.cases(na_env), ]
@@ -228,12 +228,12 @@ if (!is.null(ncol(dat$gen))) {
     # print(paste0("pc object has ", nrow(pc), " rows"))
     print(paste0("gen object has ", nrow(gen), " rows"))
     
-    if (is.null(correctPC)) {
+    if (!correctPC) {
       moddf <- data.frame(env)
       f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+")))
     }
     
-    if (!is.null(correctPC)) {
+    if (correctPC) {
       moddf <- data.frame(env, pc)
       f <- as.formula(paste0("gen ~ ", paste(colnames(env), collapse = "+"), "+ Condition(", paste(colnames(pc), collapse = "+"), ")"))
     }
@@ -250,6 +250,7 @@ if (!is.null(ncol(dat$gen))) {
                         model = model, 
                         correctGEO = correctGEO, 
                         correctPC = correctPC, 
+                        pc_path = pc_path,
                         nPC = nPC, 
                         Pin = Pin, 
                         R2permutations = R2permutations, 

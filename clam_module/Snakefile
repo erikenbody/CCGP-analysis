@@ -1,0 +1,285 @@
+"""
+GVCF-based clam workflow: ROH-corrected heterozygosity + windowed pi/dxy/fst
+across all populations defined in pop_analysis.
+
+Inputs (produced by pop_analysis):
+  - results/{ref}/pop_analysis/{prefix}_populations/population_{k}.txt
+  - results/{ref}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh
+  - results/{ref}/CCGP/{prefix}_annotated.vcf.gz
+
+Outputs (under results/{ref}/clam/{prefix}/):
+  - pi.tsv, heterozygosity.tsv (always)
+  - dxy.tsv, fst.tsv (only when >1 population)
+  - summary_per_pop.tsv   : genome-wide pi / het / het_not_roh per population
+  - summary_pairwise.tsv  : genome-wide dxy + fst per population pair (>=2 pops)
+  - summary_report.txt    : human-readable summary log
+  - clam_stat.done, clam_summary.done sentinels
+
+Config knobs (all optional, read from project config.yaml):
+  clam_min_depth            (default 5)
+  clam_max_depth            (default 100)
+  clam_min_gq               (default 20)
+  clam_window               (default 50000)
+  clam_min_samples_per_pop  (default 2)   # pops below this are dropped
+  clam_max_samples_per_pop  (default null) # cap per pop for testing
+  clam_rsync_host           (default ccgp-download.gi.ucsc.edu::ccgp)
+  clam_keep_gvcfs           (default false) # if true, don't auto-delete gvcfs after clam_loci
+  clam_gvcfs_dir            (default results/{refGenome}/clam/{prefix}/gvcfs)
+                            # where GVCFs are staged; set to e.g.
+                            # /storage2/erik/ccgp_gvcfs/{refGenome}/{prefix}
+                            # to use bulk storage. Must contain BOTH {refGenome}
+                            # and {prefix} (Snakemake wildcard constraint).
+  clam_loci_threads         (default 16) # lower to 4-8 when staging gvcfs on slow disk
+"""
+
+from pathlib import Path
+
+
+def _clam_pop_samples(ref, prefix):
+    """Read population_*.txt, applying min/max per-pop limits from config.
+    Returns {pop_label: [samples...]}. Deterministic (sorted file names, stable sample order)."""
+    pops_dir = Path(f"results/{ref}/pop_analysis/{prefix}_populations")
+    if not pops_dir.is_dir():
+        return {}
+    min_n = config.get("clam_min_samples_per_pop", 2)
+    max_n = config.get("clam_max_samples_per_pop", None)
+    out = {}
+    for f in sorted(pops_dir.iterdir()):
+        if not (f.is_file() and f.name.startswith("population_") and f.suffix == ".txt"):
+            continue
+        k = f.stem.split("_")[1]
+        with open(f) as fh:
+            samples = [s.strip() for s in fh if s.strip()]
+        if max_n is not None:
+            samples = samples[:int(max_n)]
+        if len(samples) < int(min_n):
+            continue
+        out[f"pop{k}"] = samples
+    return out
+
+
+def _clam_active_k(wc):
+    """k values that survive min/max-per-pop filtering."""
+    checkpoints.distinguish_populations.get(**wc)  # gate on checkpoint
+    pops = _clam_pop_samples(wc.refGenome, wc.prefix)
+    return sorted(lbl.removeprefix("pop") for lbl in pops)
+
+
+def _clam_roh_inputs(wc):
+    return expand(
+        "results/{refGenome}/pop_analysis/{prefix}_merged_roh/population_{k}.rg.roh",
+        refGenome=wc.refGenome, prefix=wc.prefix, k=_clam_active_k(wc),
+    )
+
+
+def _as_bool(v):
+    """Robust bool coercion — config values from --config are strings."""
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ("true", "1", "yes", "on")
+
+
+def _clam_gvcfs_dir(path):
+    """Wrap gvcfs dir in temp(directory(...)) unless clam_keep_gvcfs=true."""
+    d = directory(path)
+    return d if _as_bool(config.get("clam_keep_gvcfs", False)) else temp(d)
+
+
+CLAMG_GVCFS_TPL = config.get(
+    "clam_gvcfs_dir",
+    "results/{refGenome}/clam/{prefix}/gvcfs",
+)
+for _tok in ("{refGenome}", "{prefix}"):
+    if _tok not in CLAMG_GVCFS_TPL:
+        raise WorkflowError(
+            f"clam_gvcfs_dir must contain {_tok} (both {{refGenome}} and {{prefix}} "
+            f"are required by snakemake's wildcard constraint). Got: {CLAMG_GVCFS_TPL!r}"
+        )
+
+
+rule clamg_samples_tsv:
+    """Flat sample->population TSV for clam, respecting min/max-per-pop caps."""
+    input:
+        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+    output:
+        samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
+        n_pops = "results/{refGenome}/clam/{prefix}/n_populations.txt",
+    run:
+        pops = _clam_pop_samples(wildcards.refGenome, wildcards.prefix)
+        lines = [f"{s}\t{pop}" for pop, ss in pops.items() for s in ss]
+        Path(output.samples_tsv).write_text("\n".join(lines) + "\n")
+        Path(output.n_pops).write_text(f"{len(pops)}\n")
+
+
+rule clamg_gvcf_list:
+    """Build rsync --files-from manifest (SAMPLE.g.vcf.gz + .tbi per sample)."""
+    input:
+        samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
+    output:
+        files_list = "results/{refGenome}/clam/{prefix}/gvcf_files.txt",
+    run:
+        with open(input.samples_tsv) as fh, open(output.files_list, "w") as out:
+            for line in fh:
+                name = line.split("\t")[0].strip()
+                if name:
+                    out.write(f"{name}.g.vcf.gz\n{name}.g.vcf.gz.tbi\n")
+
+
+rule clamg_rsync_gvcfs:
+    """Download per-sample GVCFs + tabix indexes from CCGP rsync module.
+    Only files listed in gvcf_files.txt are transferred, so test mode
+    (clam_max_samples_per_pop) stays small.
+
+    The gvcfs directory is declared as temp by default — it is removed once
+    clamg_loci (the only consumer) finishes. Set clam_keep_gvcfs=true in config
+    to retain them (useful during iteration)."""
+    input:
+        files_list = "results/{refGenome}/clam/{prefix}/gvcf_files.txt",
+    output:
+        gvcfs_dir = _clam_gvcfs_dir(CLAMG_GVCFS_TPL),
+    params:
+        remote = lambda wc: f"{config.get('clam_rsync_host', 'ccgp-download.gi.ucsc.edu::ccgp')}/{wc.prefix}/gvcfs/",
+    log:
+        "logs/{refGenome}/clam/{prefix}/rsync.log",
+    threads: 2
+    shell:
+        """
+        mkdir -p {output.gvcfs_dir}
+        rsync -a --partial --files-from={input.files_list} {params.remote} {output.gvcfs_dir}/ > {log} 2>&1
+        """
+
+
+rule clamg_combine_roh:
+    """Concatenate per-pop merged ROH into a single sorted bgzipped+tabixed BED.
+    merged_roh files already carry (chrom, start, end, sample) in cols 1-4."""
+    input:
+        pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+        roh_files = _clam_roh_inputs,
+    output:
+        bed_gz = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz",
+        bed_tbi = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz.tbi",
+    conda:
+        "envs/clam.yml"
+    shell:
+        """
+        cat {input.roh_files} \
+          | awk 'BEGIN{{OFS="\\t"}} NF>=4 {{print $1,$2,$3,$4}}' \
+          | sort -k1,1 -k2,2n \
+          | bgzip -c > {output.bed_gz}
+        tabix -p bed {output.bed_gz}
+        """
+
+
+rule clamg_prepare_vcf:
+    """Symlink the pop_analysis main VCF and create a .tbi (clam expects tabix)."""
+    input:
+        vcf = "results/{refGenome}/CCGP/{prefix}_annotated.vcf.gz",
+    output:
+        vcf = "results/{refGenome}/clam/{prefix}/variants.vcf.gz",
+        tbi = "results/{refGenome}/clam/{prefix}/variants.vcf.gz.tbi",
+    conda:
+        "envs/clam.yml"
+    shell:
+        """
+        ln -sf $(readlink -f {input.vcf}) {output.vcf}
+        tabix -f -p vcf {output.vcf}
+        """
+
+
+rule clamg_loci:
+    """Generate callable-loci zarr from GVCFs. Population metadata is embedded
+    in the zarr so `clam stat` picks it up automatically."""
+    input:
+        gvcfs_dir = CLAMG_GVCFS_TPL,
+        samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
+    output:
+        done = touch("results/{refGenome}/clam/{prefix}/callable.zarr.done"),
+    params:
+        zarr = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/callable.zarr",
+        min_depth = config.get("clam_min_depth", 5),
+        max_depth = config.get("clam_max_depth", 100),
+        min_gq = config.get("clam_min_gq", 20),
+    conda:
+        "envs/clam.yml"
+    threads: int(config.get("clam_loci_threads", 16))
+    log:
+        "logs/{refGenome}/clam/{prefix}/clam_loci.log",
+    shell:
+        """
+        rm -rf {params.zarr}
+        clam loci \
+          -o {params.zarr} \
+          -m {params.min_depth} \
+          -M {params.max_depth} \
+          --min-gq {params.min_gq} \
+          -p {input.samples_tsv} \
+          -t {threads} \
+          {input.gvcfs_dir}/*.g.vcf.gz > {log} 2>&1
+        """
+
+
+rule clamg_stat:
+    """Compute windowed pi (always) + dxy/fst (when K>1) + ROH-corrected heterozygosity.
+    Clam writes fixed filenames (pi.tsv etc.) into -o; we rename them to include
+    the project prefix. dxy.tsv/fst.tsv only exist when >1 population, so their
+    rename is conditional."""
+    input:
+        zarr_done = "results/{refGenome}/clam/{prefix}/callable.zarr.done",
+        vcf = "results/{refGenome}/clam/{prefix}/variants.vcf.gz",
+        tbi = "results/{refGenome}/clam/{prefix}/variants.vcf.gz.tbi",
+        roh_bed = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz",
+        roh_tbi = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz.tbi",
+    output:
+        pi = "results/{refGenome}/clam/{prefix}/{prefix}_pi.tsv",
+        het = "results/{refGenome}/clam/{prefix}/{prefix}_heterozygosity.tsv",
+        done = touch("results/{refGenome}/clam/{prefix}/{prefix}_clam_stat.done"),
+    params:
+        zarr = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/callable.zarr",
+        outdir = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}",
+        window = config.get("clam_window", 50000),
+    conda:
+        "envs/clam.yml"
+    threads: 16
+    log:
+        "logs/{refGenome}/clam/{prefix}/clam_stat.log",
+    shell:
+        """
+        clam stat \
+          -o {params.outdir} \
+          -w {params.window} \
+          -c {params.zarr} \
+          -r {input.roh_bed} \
+          --force-samples \
+          -t {threads} \
+          {input.vcf} > {log} 2>&1
+
+        mv {params.outdir}/pi.tsv            {output.pi}
+        mv {params.outdir}/heterozygosity.tsv {output.het}
+        [ -f {params.outdir}/dxy.tsv ] && mv {params.outdir}/dxy.tsv {params.outdir}/{wildcards.prefix}_dxy.tsv || true
+        [ -f {params.outdir}/fst.tsv ] && mv {params.outdir}/fst.tsv {params.outdir}/{wildcards.prefix}_fst.tsv || true
+        """
+
+
+rule clamg_summary:
+    """Aggregate per-window TSVs into two comma-separated genome-wide summaries:
+      - per-population: pi, heterozygosity, heterozygosity_not_roh (weighted by callable sites)
+      - pairwise (>=2 pops): dxy (weighted) and Hudson Fst from genome-wide pi+dxy.
+        Header-only when K=1."""
+    input:
+        pi = "results/{refGenome}/clam/{prefix}/{prefix}_pi.tsv",
+        het = "results/{refGenome}/clam/{prefix}/{prefix}_heterozygosity.tsv",
+        n_pops = "results/{refGenome}/clam/{prefix}/n_populations.txt",
+        samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
+        stat_done = "results/{refGenome}/clam/{prefix}/{prefix}_clam_stat.done",
+    output:
+        per_pop = "results/{refGenome}/clam/{prefix}/{prefix}_summary_per_pop.csv",
+        pairwise = "results/{refGenome}/clam/{prefix}/{prefix}_summary_pairwise.csv",
+    params:
+        dxy = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/{wc.prefix}_dxy.tsv",
+        fst = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/{wc.prefix}_fst.tsv",
+    conda:
+        "envs/clam.yml"
+    log:
+        "logs/{refGenome}/clam/{prefix}/clam_summary.log",
+    script:
+        "scripts/summarize_clam.py"
