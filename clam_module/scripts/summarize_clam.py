@@ -1,11 +1,13 @@
 """Aggregate clam per-window TSVs into two genome-wide CSV summaries.
 
-Per-pop summary (weighted by Σcallable across windows):
+Per-pop summary (restricted to scaffolds >= clam_min_scaffold_size; weighted by
+Σcallable across windows on those scaffolds):
   pi                      = Σdifferences / Σcomparisons        [pi.tsv]
   heterozygosity          = Σhet_total   / Σcallable_total     [het.tsv]
   heterozygosity_not_roh  = Σhet_not_in_roh / Σcallable_not_in_roh
 
-Pairwise summary (only when >=2 pops; header-only otherwise):
+Pairwise summary (ALL scaffolds, no size filter; only when >=2 pops; header-only
+otherwise):
   dxy         = Σdifferences / Σcomparisons        [dxy.tsv]
   fst_hudson  = (dxy - (pi1+pi2)/2) / dxy          [ratio-of-averages]
   fst_win_mean = mean of per-window fst            [fst.tsv]
@@ -33,14 +35,22 @@ het_path = Path(snakemake.input.het)
 dxy_path = Path(snakemake.params.dxy)
 fst_path = Path(snakemake.params.fst)
 n_pops = int(Path(snakemake.input.n_pops).read_text().strip())
+min_scaffold_size = int(snakemake.params.min_scaffold_size)
 
 pop_n = (
     pd.read_csv(snakemake.input.samples_tsv, sep="\t", header=None, names=["sample", "population"])
     .groupby("population", as_index=False).size().rename(columns={"size": "n_samples"})
 )
 
+# Scaffolds >= min_scaffold_size (used only for pi/het aggregation)
+fai = pd.read_csv(
+    snakemake.input.fai, sep="\t", header=None, usecols=[0, 1], names=["chrom", "length"]
+)
+big_scaffolds = set(fai.loc[fai["length"] >= min_scaffold_size, "chrom"])
+
 # --- per-population pi ----------------------------------------------------
 pi_df = pd.read_csv(pi_path, sep="\t")
+pi_df = pi_df[pi_df["chrom"].isin(big_scaffolds)]
 pi_agg = pi_df.groupby("population", as_index=False).agg(
     differences=("differences", "sum"),
     comparisons=("comparisons", "sum"),
@@ -49,6 +59,7 @@ pi_agg["pi"] = pi_agg["differences"] / pi_agg["comparisons"].replace(0, pd.NA)
 
 # --- per-population het + het_not_roh -------------------------------------
 het_df = pd.read_csv(het_path, sep="\t")
+het_df = het_df[het_df["chrom"].isin(big_scaffolds)]
 het_agg = het_df.groupby("population", as_index=False).agg(
     het_total=("het_total", "sum"),
     callable_sites=("callable_total", "sum"),

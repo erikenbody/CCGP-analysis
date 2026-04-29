@@ -30,9 +30,52 @@ Config knobs (all optional, read from project config.yaml):
                             # to use bulk storage. Must contain BOTH {refGenome}
                             # and {prefix} (Snakemake wildcard constraint).
   clam_loci_threads         (default 16) # lower to 4-8 when staging gvcfs on slow disk
+  clam_min_roh_size         (default 500000) # ROH intervals shorter than this are
+                            # dropped before being fed to clam stat (affects
+                            # heterozygosity_not_in_roh only). Matches pop_froh.
+  clam_min_scaffold_size    (default 10000000) # scaffolds shorter than this are
+                            # excluded from the per-pop pi/het summary
+                            # (summary_per_pop.csv). dxy/fst summary keeps all
+                            # scaffolds. Matches pop_froh's >10Mbp rule.
 """
 
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Dual-mode bootstrap.
+#   Included from the main workflow (default): this block is skipped — the
+#       parent Snakefile owns rule all + the real distinguish_populations
+#       checkpoint (in pop_analysis/Snakefile).
+#   Invoked directly with --config clam_standalone=true : declare the default
+#       target and a no-op checkpoint that gates on the already-existing
+#       _populations directory and done marker, without touching them.
+#   Standalone usage:
+#       snakemake -s clam_module/Snakefile \
+#           --dir projects/<proj>/ \
+#           --profile profiles/silverbullet_reruns \
+#           --config config_file=config.yaml clam_standalone=true
+# ---------------------------------------------------------------------------
+if config.get("clam_standalone", False):
+
+    configfile: config["config_file"]
+
+    rule all:
+        input:
+            expand(
+                "results/{refGenome}/clam/{prefix}/{prefix}_summary_per_pop.csv",
+                refGenome=config["refgenome"],
+                prefix=config["final_prefix"],
+            )
+
+    checkpoint distinguish_populations:
+        input:
+            pops_dir = "results/{refGenome}/pop_analysis/{prefix}_populations",
+            pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
+        output:
+            gate = touch("results/{refGenome}/clam/{prefix}/.populations_gate"),
+        shell:
+            ":"
 
 
 def _clam_pop_samples(ref, prefix):
@@ -151,19 +194,23 @@ rule clamg_rsync_gvcfs:
 
 rule clamg_combine_roh:
     """Concatenate per-pop merged ROH into a single sorted bgzipped+tabixed BED.
-    merged_roh files already carry (chrom, start, end, sample) in cols 1-4."""
+    merged_roh files already carry (chrom, start, end, sample) in cols 1-4.
+    Drops intervals shorter than clam_min_roh_size (default 500 kb) so clam's
+    heterozygosity_not_in_roh matches the convention used by pop_froh."""
     input:
         pops_done = "results/{refGenome}/pop_analysis/{prefix}_populations-done.txt",
         roh_files = _clam_roh_inputs,
     output:
         bed_gz = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz",
         bed_tbi = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz.tbi",
+    params:
+        min_roh_size = int(config.get("clam_min_roh_size", 500000)),
     conda:
         "envs/clam.yml"
     shell:
         """
         cat {input.roh_files} \
-          | awk 'BEGIN{{OFS="\\t"}} NF>=4 {{print $1,$2,$3,$4}}' \
+          | awk -v m={params.min_roh_size} 'BEGIN{{OFS="\\t"}} NF>=4 && ($3-$2)>=m {{print $1,$2,$3,$4}}' \
           | sort -k1,1 -k2,2n \
           | bgzip -c > {output.bed_gz}
         tabix -p bed {output.bed_gz}
@@ -188,10 +235,12 @@ rule clamg_prepare_vcf:
 
 rule clamg_loci:
     """Generate callable-loci zarr from GVCFs. Population metadata is embedded
-    in the zarr so `clam stat` picks it up automatically."""
+    in the zarr so `clam stat` picks it up automatically.
+    Excludes sex-linked / anomalous scaffolds identified by pop_analysis."""
     input:
         gvcfs_dir = CLAMG_GVCFS_TPL,
         samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
+        exclude_file = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_exclude_scaffolds.txt",
     output:
         done = touch("results/{refGenome}/clam/{prefix}/callable.zarr.done"),
     params:
@@ -207,6 +256,10 @@ rule clamg_loci:
     shell:
         """
         rm -rf {params.zarr}
+        EXCLUDE_ARG=""
+        if [ -s {input.exclude_file} ]; then
+          EXCLUDE_ARG="--exclude-file {input.exclude_file}"
+        fi
         clam loci \
           -o {params.zarr} \
           -m {params.min_depth} \
@@ -214,6 +267,7 @@ rule clamg_loci:
           --min-gq {params.min_gq} \
           -p {input.samples_tsv} \
           -t {threads} \
+          $EXCLUDE_ARG \
           {input.gvcfs_dir}/*.g.vcf.gz > {log} 2>&1
         """
 
@@ -229,6 +283,7 @@ rule clamg_stat:
         tbi = "results/{refGenome}/clam/{prefix}/variants.vcf.gz.tbi",
         roh_bed = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz",
         roh_tbi = "results/{refGenome}/clam/{prefix}/combined_roh.bed.gz.tbi",
+        exclude_file = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_exclude_scaffolds.txt",
     output:
         pi = "results/{refGenome}/clam/{prefix}/{prefix}_pi.tsv",
         het = "results/{refGenome}/clam/{prefix}/{prefix}_heterozygosity.tsv",
@@ -244,6 +299,10 @@ rule clamg_stat:
         "logs/{refGenome}/clam/{prefix}/clam_stat.log",
     shell:
         """
+        EXCLUDE_ARG=""
+        if [ -s {input.exclude_file} ]; then
+          EXCLUDE_ARG="--exclude-file {input.exclude_file}"
+        fi
         clam stat \
           -o {params.outdir} \
           -w {params.window} \
@@ -251,6 +310,7 @@ rule clamg_stat:
           -r {input.roh_bed} \
           --force-samples \
           -t {threads} \
+          $EXCLUDE_ARG \
           {input.vcf} > {log} 2>&1
 
         mv {params.outdir}/pi.tsv            {output.pi}
@@ -262,21 +322,24 @@ rule clamg_stat:
 
 rule clamg_summary:
     """Aggregate per-window TSVs into two comma-separated genome-wide summaries:
-      - per-population: pi, heterozygosity, heterozygosity_not_roh (weighted by callable sites)
+      - per-population: pi, heterozygosity, heterozygosity_not_roh, restricted to
+        scaffolds >= clam_min_scaffold_size (default 10 Mbp).
       - pairwise (>=2 pops): dxy (weighted) and Hudson Fst from genome-wide pi+dxy.
-        Header-only when K=1."""
+        Uses ALL scaffolds (no size filter). Header-only when K=1."""
     input:
         pi = "results/{refGenome}/clam/{prefix}/{prefix}_pi.tsv",
         het = "results/{refGenome}/clam/{prefix}/{prefix}_heterozygosity.tsv",
         n_pops = "results/{refGenome}/clam/{prefix}/n_populations.txt",
         samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
         stat_done = "results/{refGenome}/clam/{prefix}/{prefix}_clam_stat.done",
+        fai = "results/{refGenome}/data/genome/{refGenome}.fna.fai",
     output:
         per_pop = "results/{refGenome}/clam/{prefix}/{prefix}_summary_per_pop.csv",
         pairwise = "results/{refGenome}/clam/{prefix}/{prefix}_summary_pairwise.csv",
     params:
         dxy = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/{wc.prefix}_dxy.tsv",
         fst = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/{wc.prefix}_fst.tsv",
+        min_scaffold_size = int(config.get("clam_min_scaffold_size", 10000000)),
     conda:
         "envs/clam.yml"
     log:
