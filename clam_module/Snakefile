@@ -16,9 +16,24 @@ Outputs (under results/{ref}/clam/{prefix}/):
   - clam_stat.done, clam_summary.done sentinels
 
 Config knobs (all optional, read from project config.yaml):
-  clam_min_depth            (default 5)
-  clam_max_depth            (default 100)
-  clam_min_gq               (default 20)
+  clam_min_mean_depth       (default null) # if BOTH min/max set, the estimator
+  clam_max_mean_depth       (default null) # is skipped and these flat values
+                            # are passed to clam loci's --min-mean-depth /
+                            # --max-mean-depth. Use this for projects missing
+                            # QC/{prefix}_bam_sumstats.txt or when you've
+                            # measured depth bounds another way.
+  clam_mean_depth_sd_scale  (default 2) # only used when estimating: cohort
+                            # per-site mean depth filter:
+                            #   min_mean_depth = max(0, cohort_mean - N*sqrt(cohort_mean))
+                            #   max_mean_depth =        cohort_mean + N*sqrt(cohort_mean)
+                            # cohort_mean is estimated from QC/{prefix}_bam_sumstats.txt
+                            # assuming 150 bp reads, dup-excluded, mapped reads only.
+                            # Matches snpArcher's per-chrom Poisson-SD coverage filter
+                            # (cov_filter.smk + create_coverage_bed.py).
+  clam_min_gq               (default 0) # passed to `clam loci --min-gq`. Off
+                            # (0) by default to match the rest of the CCGP
+                            # postprocess pipeline, which doesn't apply a GQ
+                            # filter either.
   clam_window               (default 50000)
   clam_min_samples_per_pop  (default 2)   # pops below this are dropped
   clam_max_samples_per_pop  (default null) # cap per pop for testing
@@ -192,6 +207,41 @@ rule clamg_rsync_gvcfs:
         """
 
 
+def _cohort_depth_inputs(wildcards):
+    """If flat clam_min_mean_depth + clam_max_mean_depth are configured, the
+    script writes those through and doesn't need bam_sumstats/fai. Otherwise
+    require the QC inputs for estimation."""
+    base = {
+        "samples_tsv": f"results/{wildcards.refGenome}/clam/{wildcards.prefix}/samples.tsv",
+    }
+    if config.get("clam_min_mean_depth") is None or config.get("clam_max_mean_depth") is None:
+        base["bam_sumstats"] = f"results/{wildcards.refGenome}/QC/{wildcards.prefix}_bam_sumstats.txt"
+        base["fai"] = f"results/{wildcards.refGenome}/data/genome/{wildcards.refGenome}.fna.fai"
+    return base
+
+
+rule clamg_cohort_mean_depth:
+    """Produce a bash-sourceable env file with MIN_MEAN_DEPTH and MAX_MEAN_DEPTH
+    for `clam loci`. Two modes:
+      - flat: both clam_min_mean_depth and clam_max_mean_depth set in config
+        => those values are written through, no QC files required.
+      - estimate: estimate cohort per-base mean depth from QC/{prefix}_bam_sumstats.txt
+        + .fai, write Poisson SD bounds. See scripts/cohort_mean_depth.py."""
+    input:
+        unpack(_cohort_depth_inputs),
+    output:
+        depth_file = "results/{refGenome}/clam/{prefix}/cohort_mean_depth.env",
+    params:
+        sd_scale = float(config.get("clam_mean_depth_sd_scale", 2)),
+        read_length = 150,
+        flat_min_mean_depth = config.get("clam_min_mean_depth"),
+        flat_max_mean_depth = config.get("clam_max_mean_depth"),
+    conda:
+        "envs/clam.yml"
+    script:
+        "scripts/cohort_mean_depth.py"
+
+
 rule clamg_combine_roh:
     """Concatenate per-pop merged ROH into a single sorted bgzipped+tabixed BED.
     merged_roh files already carry (chrom, start, end, sample) in cols 1-4.
@@ -236,18 +286,23 @@ rule clamg_prepare_vcf:
 rule clamg_loci:
     """Generate callable-loci zarr from GVCFs. Population metadata is embedded
     in the zarr so `clam stat` picks it up automatically.
-    Excludes sex-linked / anomalous scaffolds identified by pop_analysis."""
+    Excludes sex-linked / anomalous scaffolds identified by pop_analysis.
+
+    Uses cohort per-site mean depth bounds (--min-mean-depth/--max-mean-depth)
+    estimated by clamg_cohort_mean_depth, matching snpArcher's cov_filter
+    convention. No per-individual depth or GQ filter is applied — the upstream
+    snpArcher VCF processing does not apply those either, so adding them here
+    would skew clam's stats relative to the rest of the pipeline."""
     input:
         gvcfs_dir = CLAMG_GVCFS_TPL,
         samples_tsv = "results/{refGenome}/clam/{prefix}/samples.tsv",
         exclude_file = "results/{refGenome}/pop_analysis/{prefix}_sex_id/{prefix}_exclude_scaffolds.txt",
+        depth_file = "results/{refGenome}/clam/{prefix}/cohort_mean_depth.env",
     output:
         done = touch("results/{refGenome}/clam/{prefix}/callable.zarr.done"),
     params:
         zarr = lambda wc: f"results/{wc.refGenome}/clam/{wc.prefix}/callable.zarr",
-        min_depth = config.get("clam_min_depth", 5),
-        max_depth = config.get("clam_max_depth", 100),
-        min_gq = config.get("clam_min_gq", 20),
+        min_gq = config.get("clam_min_gq", 0),
     conda:
         "envs/clam.yml"
     threads: int(config.get("clam_loci_threads", 16))
@@ -260,10 +315,11 @@ rule clamg_loci:
         if [ -s {input.exclude_file} ]; then
           EXCLUDE_ARG="--exclude-file {input.exclude_file}"
         fi
+        source {input.depth_file}
         clam loci \
           -o {params.zarr} \
-          -m {params.min_depth} \
-          -M {params.max_depth} \
+          --min-mean-depth $MIN_MEAN_DEPTH \
+          --max-mean-depth $MAX_MEAN_DEPTH \
           --min-gq {params.min_gq} \
           -p {input.samples_tsv} \
           -t {threads} \
